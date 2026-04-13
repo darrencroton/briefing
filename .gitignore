@@ -1,0 +1,11 @@
+.DS_Store
+.claude/
+.pytest_cache/
+.venv/
+__pycache__/
+*.pyc
+archive/
+logs/*.log
+state/occurrences/*.json
+state/runs/*.json
+tmp/

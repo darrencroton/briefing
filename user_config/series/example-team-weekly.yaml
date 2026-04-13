@@ -1,0 +1,24 @@
+series_id: cas-strategy
+display_name: CAS Strategy Meeting
+note_slug: cas-strategy-meeting
+match:
+  title_any:
+    - CAS Strategy Meeting
+    - CAS Strategy
+  attendee_emails_any:
+    - barry@example.edu
+sources:
+  slack:
+    channel_refs:
+      - direct-reports
+    dm_user_ids:
+      - U0123ABC456
+  notion:
+    - label: Barry weekly notes
+      page_id: abc123def456
+      required: false
+  files:
+    - label: Project tracker
+      path: ~/Documents/projects/barry-tracker.md
+      required: false
+

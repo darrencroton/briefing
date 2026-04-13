@@ -1,0 +1,14 @@
+{{FRONTMATTER}}
+
+# {{HEADING}}
+[[{{SERIES_LINK}}]]
+
+---
+{{SUMMARY_BLOCK}}
+
+## Meeting Notes
+{{MEETING_NOTES_PLACEHOLDER}}
+
+## Actions
+{{ACTIONS_PLACEHOLDER}}
+

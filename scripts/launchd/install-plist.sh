@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+DEFAULT_PLIST="${REPO_ROOT}/tmp/launchd/com.user.briefing.plist"
+TARGET_PLIST="${1:-${DEFAULT_PLIST}}"
+INSTALL_PATH="${HOME}/Library/LaunchAgents/com.user.briefing.plist"
+
+if [[ ! -f "${TARGET_PLIST}" ]]; then
+  "${SCRIPT_DIR}/render-plist.sh"
+fi
+
+plutil -lint "${TARGET_PLIST}"
+mkdir -p "${HOME}/Library/LaunchAgents"
+cp "${TARGET_PLIST}" "${INSTALL_PATH}"
+launchctl bootout "gui/$(id -u)" "${INSTALL_PATH}" >/dev/null 2>&1 || true
+launchctl bootstrap "gui/$(id -u)" "${INSTALL_PATH}"
+launchctl enable "gui/$(id -u)/com.user.briefing"
+
+echo "Installed ${INSTALL_PATH}"
+

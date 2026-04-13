@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "briefing"
+version = "0.1.0"
+description = "Local macOS meeting briefing generator for Obsidian"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "PyYAML>=6.0.2,<7",
+  "requests>=2.32.3,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.5,<9",
+]
+
+[project.scripts]
+briefing = "briefing.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/briefing"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
