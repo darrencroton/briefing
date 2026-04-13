@@ -1,6 +1,6 @@
 # Briefing
 
-`briefing` is a local macOS meeting-preparation system. It watches Apple Calendar for upcoming configured meetings, gathers context from a small set of source adapters, asks an LLM to write a concise pre-meeting briefing, and saves the final Markdown note straight into an Obsidian vault for use on iPad during the meeting.
+`briefing` creates clean, contextual meeting briefings in Obsidian. It watches Apple Calendar for upcoming configured meetings, gathers context from a small set of source adapters, asks an LLM to write a concise pre-meeting briefing, and saves the final Markdown note into an Obsidian vault or another Markdown notes workspace.
 
 The design goal is not “clever automation”. The goal is boring reliability: local-first, explicit configuration, deterministic note paths, managed refreshes, and clear validation for anything that can break.
 
@@ -8,14 +8,14 @@ The design goal is not “clever automation”. The goal is boring reliability: 
 
 The finished system is intended to behave like this:
 
-1. A `launchd` job runs `briefing run` every 15 minutes on the Mac Studio.
+1. A `launchd` job runs `briefing run` every 15 minutes on the host Mac.
 2. `briefing` queries Apple Calendar through `icalPal` for meetings starting soon.
 3. Only explicitly configured meeting series are eligible.
 4. The matched series configuration defines which context sources to gather.
 5. Source adapters run in parallel and return labeled source blocks.
 6. The LLM produces only the `Pre-Meeting Summary` content.
-7. `briefing` writes or refreshes a managed Markdown note in the Obsidian vault.
-8. iCloud sync delivers that note to Obsidian on iPad for the meeting itself.
+7. `briefing` writes or refreshes a managed Markdown note in the configured notes directory.
+8. That note is then available wherever the notes workspace is accessed or synced.
 
 The long-term user experience is “set and forget”:
 
@@ -23,6 +23,7 @@ The long-term user experience is “set and forget”:
 - explicit enough to debug quickly
 - simple enough to maintain without a large automation stack
 - local enough that calendar access and orchestration stay on the Mac
+- portable enough that the output remains useful beyond one sync or device setup
 
 ## Current v1 Implementation
 
@@ -54,7 +55,7 @@ launchd
     -> collect sources in parallel
     -> build tracked prompt
     -> claude --print
-    -> write or refresh note in Obsidian
+    -> write or refresh note in configured notes workspace
     -> record state and diagnostics
 ```
 
@@ -86,7 +87,7 @@ archive/                  untracked reference material and scratch assets
 
 ### Global settings
 
-[user_config/settings.toml](/Users/dcroton/Local/git-repos/briefing/user_config/settings.toml) is the source of truth for:
+[`user_config/settings.toml`](user_config/settings.toml) is the source of truth for:
 
 - vault and note paths
 - calendar lead window
@@ -96,9 +97,11 @@ archive/                  untracked reference material and scratch assets
 - Slack, Notion, and file source defaults
 - logging behavior
 
+The default settings target a common Obsidian-on-macOS layout, but the output path can be changed to any local or synced Markdown folder.
+
 ### Meeting series
 
-Each YAML file in [user_config/series](/Users/dcroton/Local/git-repos/briefing/user_config/series) defines one meeting series with:
+Each YAML file in [`user_config/series`](user_config/series) defines one meeting series with:
 
 - `series_id`
 - `display_name`
@@ -120,7 +123,7 @@ All populated match groups must match for the series to be selected.
 Implemented in v1:
 
 - `previous_note`: latest earlier note in the same series
-- `slack`: configured channels and personal DMs via Slack user token
+- `slack`: configured channels and direct messages via Slack user token
 - `notion`: page/block extraction through the Notion API
 - `file`: local or synced files addressed by path
 
@@ -147,8 +150,8 @@ Supported variables today:
    uv sync --extra dev
    ```
 
-2. Edit [user_config/settings.toml](/Users/dcroton/Local/git-repos/briefing/user_config/settings.toml).
-3. Create meeting series files under [user_config/series](/Users/dcroton/Local/git-repos/briefing/user_config/series), or bootstrap one with `uv run briefing init-series`.
+2. Edit [`user_config/settings.toml`](user_config/settings.toml).
+3. Create meeting series files under [`user_config/series`](user_config/series), or bootstrap one with `uv run briefing init-series`.
 4. Create `~/.env.briefing` with the required secrets.
 5. Run validation:
 
@@ -162,7 +165,11 @@ Supported variables today:
    uv run briefing run
    ```
 
-7. Install automation only after manual validation succeeds. See [scripts/launchd/README.md](/Users/dcroton/Local/git-repos/briefing/scripts/launchd/README.md).
+7. Install automation only after manual validation succeeds. See [`scripts/launchd/README.md`](scripts/launchd/README.md).
+
+## Output Portability
+
+The reference workflow is Obsidian, but `briefing` writes plain Markdown files and keeps the orchestration local. That means the notes can also fit other Markdown-based workflows as long as the configured output folder and note template match the target environment.
 
 ## Validation Expectations
 

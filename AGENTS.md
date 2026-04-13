@@ -6,6 +6,8 @@ Project-specific instructions for coding agents working in this repository.
 
 `briefing` is a local-first meeting briefing system for macOS. It must remain simple, robust, explicit, and predictable. Favor operational reliability over cleverness.
 
+The primary target is Obsidian, but public-facing docs and defaults should avoid assuming one personal device, machine name, username, or sync workflow unless that assumption is truly required by the code.
+
 ## Technical Baseline
 
 - Use Python `3.13+`.
@@ -22,6 +24,7 @@ Project-specific instructions for coding agents working in this repository.
 - Never overwrite user-entered `Meeting Notes` or `Actions`.
 - Treat required source failures as blocking.
 - Prefer local-first operation and minimal moving parts.
+- Keep output as portable Markdown wherever practical, even when the default workflow is Obsidian-first.
 
 ## Repo Conventions
 
@@ -30,6 +33,7 @@ Project-specific instructions for coding agents working in this repository.
 - `user_config/prompts/` and `user_config/templates/` contain tracked prompt and note templates; do not hardcode large prompt bodies in Python when a tracked file is more appropriate.
 - `archive/` is for retained local reference material and must stay untracked.
 - `.claude/` is local agent state/config and must stay untracked.
+- Do not commit personal absolute paths or machine-specific naming when a generic default will work.
 
 ## Engineering Rules
 

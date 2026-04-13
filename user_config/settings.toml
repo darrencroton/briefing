@@ -1,5 +1,5 @@
 [paths]
-vault_root = "/Users/dcroton/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault"
+vault_root = "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault"
 meeting_notes_dir = "Work/Resources/Meeting Notes"
 log_dir = "logs"
 state_dir = "state"
