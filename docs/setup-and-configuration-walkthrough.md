@@ -220,9 +220,9 @@ Common workflow:
 
 ## Global settings reference
 
-The main config file is [`user_config/settings.toml`](/Users/dcroton/Local/git-repos/briefing/user_config/settings.toml).
+The main config file is [`user_config/settings.toml`](../user_config/settings.toml).
 
-If it does not exist yet, run `./scripts/setup.sh` to create it from [`user_config/defaults/settings.toml`](/Users/dcroton/Local/git-repos/briefing/user_config/defaults/settings.toml).
+If it does not exist yet, run `./scripts/setup.sh` to create it from [`user_config/defaults/settings.toml`](../user_config/defaults/settings.toml).
 
 ### `[paths]`
 
@@ -371,7 +371,7 @@ Practical point:
 
 Each YAML file in `user_config/series/` defines one meeting series.
 
-That directory is local and git-ignored. For a tracked example, see [`user_config/examples/series/example-team-weekly.yaml`](/Users/dcroton/Local/git-repos/briefing/user_config/examples/series/example-team-weekly.yaml).
+That directory is local and git-ignored. For a tracked example, see [`user_config/examples/series/example-team-weekly.yaml`](../user_config/examples/series/example-team-weekly.yaml).
 
 Required top-level fields:
 
@@ -588,7 +588,7 @@ uv run briefing validate
 uv run briefing run
 ```
 
-Only after that should you set up `launchd`. See [`scripts/launchd/README.md`](/Users/dcroton/Local/git-repos/briefing/scripts/launchd/README.md).
+Only after that should you set up `launchd`. See [`scripts/launchd/README.md`](../scripts/launchd/README.md).
 
 ## Suggested first-time workflow
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from briefing.calendar import parse_icalpal_events
@@ -43,6 +44,6 @@ def test_parse_icalpal_events_accepts_exchange_uuid_and_epoch_dates() -> None:
     assert event.title == "Ray"
     assert event.calendar_name == "Calendar"
     assert event.attendees == []
-    assert event.start.isoformat() == "2026-04-14T13:00:00+10:00"
+    assert event.start.timestamp() == datetime.fromtimestamp(1776135600).timestamp()
     assert event.end is not None
-    assert event.end.isoformat() == "2026-04-14T13:30:00+10:00"
+    assert event.end.timestamp() == datetime.fromtimestamp(1776137400).timestamp()
