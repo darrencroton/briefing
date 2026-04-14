@@ -47,3 +47,27 @@ def test_parse_icalpal_events_accepts_exchange_uuid_and_epoch_dates() -> None:
     assert event.start.timestamp() == datetime.fromtimestamp(1776135600).timestamp()
     assert event.end is not None
     assert event.end.timestamp() == datetime.fromtimestamp(1776137400).timestamp()
+
+
+def test_parse_icalpal_events_prefers_normalized_icalpal_dates_over_raw_ical_epoch() -> None:
+    payload = """
+    [
+      {
+        "UUID": "05C4D883-0BC7-4C2A-9A72-12F28B01B63E",
+        "title": "Barry",
+        "calendar": "Calendar",
+        "start_date": 797839500,
+        "end_date": 797843100,
+        "sdate": "2026-04-14T16:15:00+10:00",
+        "edate": "2026-04-14T17:15:00+10:00"
+      }
+    ]
+    """
+
+    events = parse_icalpal_events(payload)
+
+    assert len(events) == 1
+    event = events[0]
+    assert event.start.isoformat() == "2026-04-14T16:15:00+10:00"
+    assert event.end is not None
+    assert event.end.isoformat() == "2026-04-14T17:15:00+10:00"

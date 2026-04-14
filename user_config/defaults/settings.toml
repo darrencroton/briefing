@@ -1,6 +1,6 @@
 [paths]
 vault_root = "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault"
-meeting_notes_dir = "Work/Resources/Meeting Notes"
+meeting_notes_dir = "Work/Resources/Meetings"
 log_dir = "logs"
 state_dir = "state"
 prompt_dir = "user_config/prompts"

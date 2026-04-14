@@ -117,15 +117,25 @@ def _parse_event_record(record: dict[str, object]) -> MeetingEvent:
         first_non_empty(
             [
                 record.get("start"),
-                record.get("start_date"),
+                record.get("sctime"),
+                record.get("sdate"),
                 record.get("startDate"),
                 record.get("datetime"),
                 record.get("date"),
+                record.get("start_date"),
             ]
         )
     )
     end = parse_datetime(
-        first_non_empty([record.get("end"), record.get("end_date"), record.get("endDate")])
+        first_non_empty(
+            [
+                record.get("end"),
+                record.get("ectime"),
+                record.get("edate"),
+                record.get("endDate"),
+                record.get("end_date"),
+            ]
+        )
     )
     if not uid or not title or start is None:
         raise CalendarError(f"Could not parse icalPal event record: {record}")
