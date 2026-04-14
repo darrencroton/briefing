@@ -52,10 +52,15 @@ def build_briefing_block(summary_bullets: str) -> str:
 
 
 def normalize_summary_bullets(summary_bullets: str) -> str:
-    """Ensure the LLM output is a clean Markdown bullet list."""
-    lines = [line.rstrip() for line in summary_bullets.splitlines() if line.strip()]
+    """Ensure the LLM output is a clean Markdown bullet list, preserving group spacing."""
     bullets: list[str] = []
-    for line in lines:
+    for raw_line in summary_bullets.splitlines():
+        line = raw_line.rstrip()
+        if not line.strip():
+            if bullets and bullets[-1] != "":
+                bullets.append("")
+            continue
+
         cleaned = line.strip()
         if cleaned.startswith("- "):
             bullets.append(cleaned)
@@ -65,6 +70,9 @@ def normalize_summary_bullets(summary_bullets: str) -> str:
             bullets.append(f"- {re.sub(r'^\d+\.\s+', '', cleaned)}")
         else:
             bullets.append(f"- {cleaned}")
+
+    while bullets and bullets[-1] == "":
+        bullets.pop()
     if not bullets:
         bullets = ["- "]
     return "\n".join(bullets)

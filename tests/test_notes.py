@@ -126,3 +126,13 @@ def test_normalize_summary_bullets_converts_lists() -> None:
     normalized = normalize_summary_bullets("1. First\n* Second\nThird")
 
     assert normalized.splitlines() == ["- First", "- Second", "- Third"]
+
+
+def test_normalize_summary_bullets_preserves_single_blank_lines_between_groups() -> None:
+    normalized = normalize_summary_bullets(
+        "1. Open action\n\n* Previous note context\n\nSlack update"
+    )
+
+    assert normalized == (
+        "- Open action\n\n- Previous note context\n\n- Slack update"
+    )
