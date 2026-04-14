@@ -6,7 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from briefing.bootstrap import ensure_local_user_config
-from briefing.settings import load_settings
+from briefing.main import cli
+from briefing.settings import SettingsError, load_settings
 from briefing.setup import ensure_runtime_directories, prepare_workspace
 
 
@@ -105,6 +106,45 @@ def test_load_settings_requires_bootstrapped_local_settings(tmp_path: Path) -> N
 
     with pytest.raises(FileNotFoundError, match=r"Run \./scripts/setup\.sh"):
         load_settings(tmp_path)
+
+
+def test_load_settings_reports_actionable_toml_errors(tmp_path: Path) -> None:
+    user_config_dir = tmp_path / "user_config"
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    (user_config_dir / "settings.toml").write_text(
+        SETTINGS_TOML.replace('include_calendar_names = []', "include_calendar_names = [Calendar]"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match=r'include_calendar_names = \["Calendar"\]'):
+        load_settings(tmp_path)
+
+
+def test_load_settings_coerces_single_calendar_name_string(tmp_path: Path) -> None:
+    user_config_dir = tmp_path / "user_config"
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    (user_config_dir / "settings.toml").write_text(
+        SETTINGS_TOML.replace('include_calendar_names = []', 'include_calendar_names = "Calendar"'),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.calendar.include_calendar_names == ["Calendar"]
+
+
+def test_cli_prints_settings_errors_without_traceback(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["briefing", "validate"])
+    monkeypatch.setattr("briefing.main.load_settings", lambda: (_ for _ in ()).throw(SettingsError("bad config")))
+
+    exit_code = cli()
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err.strip() == "bad config"
 
 
 def test_prepare_workspace_warns_when_bootstrapped_provider_validation_fails(

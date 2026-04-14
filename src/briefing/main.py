@@ -10,7 +10,7 @@ import yaml
 
 from .calendar import IcalPalClient
 from .logging_utils import configure_logging
-from .settings import load_series_configs, load_settings
+from .settings import SettingsError, load_series_configs, load_settings
 from .runner import run_briefing
 from .utils import ensure_directory, slugify
 from .validation import validate_environment
@@ -33,7 +33,11 @@ def cli() -> int:
     init_parser.add_argument("--force", action="store_true", help="Overwrite an existing series file")
 
     args = parser.parse_args()
-    settings = load_settings()
+    try:
+        settings = load_settings()
+    except (FileNotFoundError, SettingsError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
     configure_logging(settings)
 
     if args.command == "run":
