@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .bootstrap import default_settings_path, local_settings_path
 from .models import (
     FileSourceConfig,
     MatchRules,
@@ -120,7 +121,12 @@ def load_settings(repo_root: Path | None = None) -> AppSettings:
     """Load the main settings file."""
     if repo_root is None:
         repo_root = Path.cwd()
-    settings_path = repo_root / "user_config" / "settings.toml"
+    settings_path = local_settings_path(repo_root)
+    if not settings_path.exists():
+        raise FileNotFoundError(
+            f"Missing local settings file: {settings_path}. "
+            f"Run ./scripts/setup.sh to bootstrap it from {default_settings_path(repo_root)}."
+        )
     data = tomllib.loads(settings_path.read_text(encoding="utf-8"))
 
     paths = data["paths"]

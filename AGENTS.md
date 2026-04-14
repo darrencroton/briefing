@@ -28,8 +28,11 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 
 ## Repo Conventions
 
-- `user_config/settings.toml` is the primary global config.
-- `user_config/series/*.yaml` is the source of truth for meeting-series configuration.
+- Run `./scripts/setup.sh` before first use to bootstrap local config from tracked defaults.
+- `user_config/settings.toml` is the local mutable global config and should stay untracked.
+- `user_config/series/*.yaml` is the local source of truth for meeting-series configuration and should stay untracked.
+- `user_config/defaults/` contains tracked bootstrap defaults.
+- `user_config/examples/` contains tracked example config files that are not loaded as live user config.
 - `user_config/prompts/` and `user_config/templates/` contain tracked prompt and note templates; do not hardcode large prompt bodies in Python when a tracked file is more appropriate.
 - `archive/` is for retained local reference material and must stay untracked.
 - `.claude/` is local agent state/config and must stay untracked.

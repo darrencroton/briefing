@@ -21,4 +21,3 @@ sources:
     - label: Project tracker
       path: ~/Documents/projects/barry-tracker.md
       required: false
-

@@ -111,7 +111,7 @@ def parse_icalpal_events(payload: str) -> list[MeetingEvent]:
 
 
 def _parse_event_record(record: dict[str, object]) -> MeetingEvent:
-    uid = str(first_non_empty([record.get("uid"), record.get("id")]) or "")
+    uid = str(first_non_empty([record.get("uid"), record.get("UUID"), record.get("id")]) or "")
     title = str(first_non_empty([record.get("title"), record.get("summary"), record.get("name")]) or "")
     start = parse_datetime(
         first_non_empty(
@@ -156,6 +156,8 @@ def _parse_attendees(value: object) -> list[dict[str, str]]:
     attendees: list[dict[str, str]] = []
     if isinstance(value, list):
         for item in value:
+            if item is None:
+                continue
             if isinstance(item, dict):
                 attendees.append(
                     {
@@ -207,4 +209,3 @@ def _string_or_none(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-

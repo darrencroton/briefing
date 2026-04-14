@@ -30,6 +30,7 @@ The long-term user experience is “set and forget”:
 The repository currently implements the core v1 system:
 
 - Python `3.13+` application managed with `uv`
+- first-run bootstrap via `./scripts/setup.sh`
 - CLI commands: `briefing run`, `briefing validate`, `briefing init-series`
 - Apple Calendar ingestion via `icalPal`
 - explicit meeting-series matching from `user_config/series/*.yaml`
@@ -73,10 +74,13 @@ launchd
 ```text
 src/briefing/             application code
 tests/                    unit and workflow tests
-user_config/settings.toml global settings
-user_config/series/       one YAML file per meeting series
+user_config/defaults/     tracked defaults copied into local config on setup
+user_config/examples/     tracked example config files
+user_config/settings.toml local global settings (bootstrapped, ignored by git)
+user_config/series/       local series YAML files (ignored by git)
 user_config/prompts/      tracked prompt templates
 user_config/templates/    tracked Markdown note templates
+scripts/setup.sh          first-run local bootstrap
 scripts/launchd/          LaunchAgent template and helper scripts
 state/                    runtime state and diagnostics
 logs/                     runtime logs
@@ -87,7 +91,7 @@ archive/                  untracked reference material and scratch assets
 
 ### Global settings
 
-[`user_config/settings.toml`](user_config/settings.toml) is the source of truth for:
+[`user_config/settings.toml`](user_config/settings.toml) is the local source of truth for:
 
 - vault and note paths
 - calendar lead window
@@ -98,6 +102,8 @@ archive/                  untracked reference material and scratch assets
 - logging behavior
 
 The default settings target a common Obsidian-on-macOS layout, but the output path can be changed to any local or synced Markdown folder.
+
+The tracked bootstrap copy lives at [`user_config/defaults/settings.toml`](user_config/defaults/settings.toml) and is copied into place by `./scripts/setup.sh` when `user_config/settings.toml` is missing.
 
 ### Meeting series
 
@@ -144,14 +150,19 @@ Supported variables today:
 
 ## Quickstart
 
-1. Install dependencies:
+New users should start with the full setup guide: [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md). It explains the install flow, what `init-series` does, how series matching works, and the most common first-run problems.
+
+1. Run setup:
 
    ```bash
-   uv sync --extra dev
+   ./scripts/setup.sh
    ```
 
+   This installs dependencies, creates the working directories, and bootstraps your local config in `user_config/`.
+   The bootstrapped default provider is `claude_cli`. If you change the `[llm]` settings, rerun `./scripts/setup.sh` to validate the configured provider prerequisites.
+
 2. Edit [`user_config/settings.toml`](user_config/settings.toml).
-3. Create meeting series files under [`user_config/series`](user_config/series), or bootstrap one with `uv run briefing init-series`.
+3. Review the example series under [`user_config/examples/series`](user_config/examples/series), then create local meeting series files under [`user_config/series`](user_config/series), or bootstrap one with `uv run briefing init-series`.
 4. Create `~/.env.briefing` with the required secrets.
 5. Run validation:
 

@@ -3,7 +3,7 @@
 Only install automation after these manual checks succeed:
 
 ```bash
-uv sync
+./scripts/setup.sh
 uv run briefing validate
 uv run briefing run
 ```

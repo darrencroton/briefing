@@ -9,3 +9,12 @@ logs/*.log
 state/occurrences/*.json
 state/runs/*.json
 tmp/
+user_config/*
+!user_config/defaults/
+!user_config/defaults/**
+!user_config/examples/
+!user_config/examples/**
+!user_config/prompts/
+!user_config/prompts/**
+!user_config/templates/
+!user_config/templates/**
