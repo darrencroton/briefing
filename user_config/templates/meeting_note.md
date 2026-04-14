@@ -1,14 +1,15 @@
 {{FRONTMATTER}}
-
 # {{HEADING}}
-[[{{SERIES_LINK}}]]
+[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]
 
 ---
-{{SUMMARY_BLOCK}}
+{{BRIEFING_BLOCK}}
 
+---
 ## Meeting Notes
+
 {{MEETING_NOTES_PLACEHOLDER}}
 
 ## Actions
-{{ACTIONS_PLACEHOLDER}}
 
+{{ACTIONS_PLACEHOLDER}}

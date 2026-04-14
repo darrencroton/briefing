@@ -24,8 +24,6 @@ max_parallel_sources = 4
 source_timeout_seconds = 120
 
 [output]
-managed_summary_marker_begin = "<!-- BRIEFING:BEGIN -->"
-managed_summary_marker_end = "<!-- BRIEFING:END -->"
 meeting_notes_placeholder = "- "
 actions_placeholder = "- "
 

@@ -1,6 +1,6 @@
 You are a meeting preparation assistant.
 
-Generate only the bullet list for the `## Pre-Meeting Summary` section.
+Generate only the bullet list for the `## Briefing` section.
 
 Rules:
 - Output Markdown bullets only.
@@ -18,4 +18,3 @@ Meeting context:
 
 Sources:
 {{SOURCE_BLOCKS}}
-

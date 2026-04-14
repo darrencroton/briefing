@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,7 +11,7 @@ import yaml
 
 from .models import MeetingEvent, SeriesConfig
 from .settings import AppSettings
-from .utils import ordinal, render_template
+from .utils import render_template
 
 
 def render_note(
@@ -21,42 +20,35 @@ def render_note(
     event: MeetingEvent,
     series: SeriesConfig,
     summary_bullets: str,
-    generated_at: datetime,
 ) -> str:
     """Render a complete note from tracked template plus deterministic metadata."""
-    frontmatter = _build_frontmatter(event, series, generated_at)
+    frontmatter = _build_frontmatter(event, series)
     heading = _build_heading(event)
-    summary_block = build_managed_summary_block(settings, summary_bullets)
+    briefing_block = build_briefing_block(summary_bullets)
     return render_template(
         template_text,
         {
             "FRONTMATTER": frontmatter,
             "HEADING": heading,
+            "DATE_LINK": event.start.date().isoformat(),
             "SERIES_LINK": f"{series.display_name} Meeting",
-            "SUMMARY_BLOCK": summary_block,
+            "BRIEFING_BLOCK": briefing_block,
             "MEETING_NOTES_PLACEHOLDER": settings.output.meeting_notes_placeholder,
             "ACTIONS_PLACEHOLDER": settings.output.actions_placeholder,
         },
     )
 
 
-def refresh_note(settings: AppSettings, existing_text: str, summary_bullets: str) -> str:
-    """Update only the managed summary block."""
-    summary_block = build_managed_summary_block(settings, summary_bullets)
-    begin = settings.output.managed_summary_marker_begin
-    end = settings.output.managed_summary_marker_end
-    pattern = re.compile(re.escape(begin) + r".*?" + re.escape(end), re.DOTALL)
-    if not pattern.search(existing_text):
-        raise ValueError("Managed summary block not found")
-    return pattern.sub(summary_block, existing_text, count=1)
+def refresh_note(existing_text: str, summary_bullets: str) -> str:
+    """Update only the managed briefing section."""
+    briefing_block = build_briefing_block(summary_bullets)
+    return _replace_section(existing_text, "Briefing", "Meeting Notes", briefing_block + "\n\n---\n")
 
 
-def build_managed_summary_block(settings: AppSettings, summary_bullets: str) -> str:
-    """Wrap the generated summary in explicit managed markers."""
+def build_briefing_block(summary_bullets: str) -> str:
+    """Render the generated briefing block for the note template."""
     summary = normalize_summary_bullets(summary_bullets)
-    begin = settings.output.managed_summary_marker_begin
-    end = settings.output.managed_summary_marker_end
-    return f"{begin}\n## Pre-Meeting Summary\n{summary}\n{end}"
+    return f"## Briefing\n\n{summary}"
 
 
 def normalize_summary_bullets(summary_bullets: str) -> str:
@@ -128,12 +120,8 @@ def find_previous_note(
         frontmatter, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
         if frontmatter.get("series_id") != series.series_id:
             continue
-        start_value = frontmatter.get("start")
-        if isinstance(start_value, datetime):
-            start = start_value
-        elif isinstance(start_value, str):
-            start = datetime.fromisoformat(start_value)
-        else:
+        start = _parse_frontmatter_start(frontmatter.get("start"))
+        if start is None:
             continue
         if start >= current_event.start:
             continue
@@ -147,14 +135,14 @@ def find_previous_note(
 def summarize_previous_note(path: Path) -> str:
     """Return the high-value sections from a previous note."""
     text = path.read_text(encoding="utf-8")
-    frontmatter, body = parse_frontmatter(text)
-    summary = extract_section(body, "Pre-Meeting Summary")
+    _, body = parse_frontmatter(text)
+    summary = extract_section(body, "Briefing")
     meeting_notes = extract_section(body, "Meeting Notes")
     actions = extract_section(body, "Actions")
-    title = frontmatter.get("title") or path.name
+    title = _extract_title(body) or path.name
     parts = [f"Title: {title}"]
     if summary:
-        parts.append("## Pre-Meeting Summary\n" + summary)
+        parts.append("## Briefing\n" + summary)
     if meeting_notes:
         parts.append("## Meeting Notes\n" + meeting_notes)
     if actions:
@@ -165,22 +153,10 @@ def summarize_previous_note(path: Path) -> str:
 def _build_frontmatter(
     event: MeetingEvent,
     series: SeriesConfig,
-    generated_at: datetime,
 ) -> str:
-    attendees = [attendee for attendee in event.attendees if attendee.get("name") or attendee.get("email")]
     payload = {
-        "title": event.title,
         "series_id": series.series_id,
-        "event_uid": event.uid,
-        "generated_at": generated_at.isoformat(),
-        "date": event.start.date().isoformat(),
         "start": event.start.isoformat(),
-        "end": event.end.isoformat() if event.end else None,
-        "calendar_name": event.calendar_name,
-        "location": event.location,
-        "organizer_name": event.organizer_name,
-        "organizer_email": event.organizer_email,
-        "attendees": attendees,
     }
     return "---\n" + yaml.safe_dump(payload, sort_keys=False).strip() + "\n---"
 
@@ -188,28 +164,70 @@ def _build_frontmatter(
 def _build_heading(event: MeetingEvent) -> str:
     end = event.end
     time_display = _format_time_window(event.start, end)
-    return (
-        f"{event.title} {time_display} "
-        f"{event.start.strftime('%A')} {ordinal(event.start.day)} "
-        f"{event.start.strftime('%B %Y')}"
-    )
+    return f"{event.title} {time_display}"
 
 
 def _format_time_window(start: datetime, end: datetime | None) -> str:
-    def _fmt(dt: datetime, with_minutes: bool) -> str:
+    def _fmt(dt: datetime, with_minutes: bool, include_meridiem: bool) -> str:
         if with_minutes:
-            return dt.strftime("%-I:%M%p").lower()
-        return dt.strftime("%-I%p").lower()
+            base = dt.strftime("%-I:%M")
+        else:
+            base = dt.strftime("%-I")
+        if include_meridiem:
+            return f"{base}{dt.strftime('%p').lower()}"
+        return base
 
     start_has_minutes = start.minute != 0
-    start_text = _fmt(start, start_has_minutes)
+    start_meridiem = start.strftime("%p").lower()
+    start_text = _fmt(start, start_has_minutes, True)
     if end is None:
         return start_text
     end_has_minutes = end.minute != 0
-    end_text = _fmt(end, end_has_minutes)
+    end_meridiem = end.strftime("%p").lower()
+    show_start_meridiem = start_meridiem != end_meridiem
+    start_text = _fmt(start, start_has_minutes, show_start_meridiem)
+    end_text = _fmt(end, end_has_minutes, True)
     return f"{start_text}–{end_text}"
 
 
 def _normalize_section_value(value: str) -> str:
     normalized = "\n".join(line.rstrip() for line in value.splitlines()).strip()
     return normalized
+
+
+def _replace_section(
+    note_text: str,
+    start_heading: str,
+    end_heading: str,
+    replacement: str,
+) -> str:
+    start_pattern = re.compile(rf"^## {re.escape(start_heading)}\n", re.MULTILINE)
+    end_pattern = re.compile(rf"^## {re.escape(end_heading)}\n", re.MULTILINE)
+    start_match = start_pattern.search(note_text)
+    if not start_match:
+        raise ValueError(f"Section heading not found: {start_heading}")
+    end_match = end_pattern.search(note_text, start_match.end())
+    if not end_match:
+        raise ValueError(f"Section heading not found: {end_heading}")
+    return note_text[: start_match.start()] + replacement + note_text[end_match.start() :]
+
+
+def _parse_frontmatter_start(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return None
+
+
+def _extract_title(body: str) -> str | None:
+    match = re.search(r"^# (?P<title>.+)$", body, re.MULTILINE)
+    if not match:
+        return None
+    heading = match.group("title").strip()
+    return re.sub(
+        r"\s+\d{1,2}(?::\d{2})?(?:am|pm)?[–-]\d{1,2}(?::\d{2})?(?:am|pm)\s*$",
+        "",
+        heading,
+        flags=re.IGNORECASE,
+    )

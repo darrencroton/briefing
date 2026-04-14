@@ -23,7 +23,7 @@ Today, the core workflow is:
    - optional Slack sources
    - optional Notion pages
    - optional local files
-4. Ask the configured LLM provider to generate bullet points for the `Pre-Meeting Summary`.
+4. Ask the configured LLM provider to generate bullet points for the `Briefing`.
 5. Create or refresh the meeting note in your configured notes folder.
 
 Important behavior:
@@ -291,14 +291,12 @@ Typical use cases:
 
 ### `[output]`
 
-- `managed_summary_marker_begin`
-- `managed_summary_marker_end`
 - `meeting_notes_placeholder`
 - `actions_placeholder`
 
-These drive the managed refresh behavior. In normal use, you usually leave them alone.
+These drive the managed note behavior. In normal use, you usually leave them alone.
 
-`briefing` only refreshes the content inside the managed marker block. It treats edits to `Meeting Notes` or `Actions` as a lock signal and stops rewriting that occurrence.
+`briefing` only refreshes the `## Briefing` section. It treats edits to `Meeting Notes` or `Actions` as a lock signal and stops rewriting that occurrence.
 
 ### `[llm]`
 

@@ -53,7 +53,7 @@ def test_process_event_writes_note_and_locks_after_user_edit(monkeypatch, app_se
     text = output_path.read_text(encoding="utf-8")
     assert "- Generated summary" in text
 
-    edited = text.replace("## Meeting Notes\n- ", "## Meeting Notes\n- User wrote notes")
+    edited = text.replace("## Meeting Notes\n\n- ", "## Meeting Notes\n\n- User wrote notes")
     output_path.write_text(edited, encoding="utf-8")
 
     second = process_event(
@@ -69,4 +69,3 @@ def test_process_event_writes_note_and_locks_after_user_edit(monkeypatch, app_se
 
     assert second["status"] == "skipped"
     assert second["reason"] == "meeting_notes_edited"
-

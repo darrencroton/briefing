@@ -230,7 +230,6 @@ def process_event(
         series=series,
         output_path=output_path,
         summary_bullets=llm_response.text,
-        now=now,
     )
     if not dry_run:
         output_path.write_text(note_text, encoding="utf-8")
@@ -261,14 +260,13 @@ def render_or_refresh_note(
     series: SeriesConfig,
     output_path: Path,
     summary_bullets: str,
-    now: datetime,
 ) -> str:
     """Create or refresh a note in managed mode."""
     template = (settings.paths.template_dir / settings.llm.note_template).read_text(encoding="utf-8")
     if output_path.exists():
         existing = output_path.read_text(encoding="utf-8")
-        return refresh_note(settings, existing, summary_bullets)
-    return render_note(settings, template, event, series, summary_bullets, now)
+        return refresh_note(existing, summary_bullets)
+    return render_note(settings, template, event, series, summary_bullets)
 
 
 def build_output_filename(event: MeetingEvent, series: SeriesConfig) -> str:

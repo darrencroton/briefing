@@ -13,7 +13,7 @@ The finished system is intended to behave like this:
 3. Only explicitly configured meeting series are eligible.
 4. The matched series configuration defines which context sources to gather.
 5. Source adapters run in parallel and return labeled source blocks.
-6. The LLM produces only the `Pre-Meeting Summary` content.
+6. The LLM produces only the `Briefing` content.
 7. `briefing` writes or refreshes a managed Markdown note in the configured notes directory.
 8. That note is then available wherever the notes workspace is accessed or synced.
 

@@ -35,7 +35,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
         encoding="utf-8",
     )
     (template_dir / "meeting_note.md").write_text(
-        "{{FRONTMATTER}}\n\n# {{HEADING}}\n[[{{SERIES_LINK}}]]\n\n---\n{{SUMMARY_BLOCK}}\n\n## Meeting Notes\n{{MEETING_NOTES_PLACEHOLDER}}\n\n## Actions\n{{ACTIONS_PLACEHOLDER}}\n",
+        "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n\n## Actions\n\n{{ACTIONS_PLACEHOLDER}}\n",
         encoding="utf-8",
     )
     env_file = tmp_path / ".env.briefing"
@@ -65,8 +65,6 @@ def app_settings(tmp_path: Path) -> AppSettings:
         ),
         execution=ExecutionSettings(max_parallel_sources=4, source_timeout_seconds=5),
         output=OutputSettings(
-            managed_summary_marker_begin="<!-- BRIEFING:BEGIN -->",
-            managed_summary_marker_end="<!-- BRIEFING:END -->",
             meeting_notes_placeholder="- ",
             actions_placeholder="- ",
         ),
@@ -116,4 +114,3 @@ def series_config(app_settings: AppSettings) -> SeriesConfig:
         sources=SeriesSources(),
         overrides={},
     )
-

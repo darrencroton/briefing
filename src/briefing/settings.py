@@ -59,8 +59,6 @@ class ExecutionSettings:
 
 @dataclass(slots=True)
 class OutputSettings:
-    managed_summary_marker_begin: str
-    managed_summary_marker_end: str
     meeting_notes_placeholder: str
     actions_placeholder: str
 
