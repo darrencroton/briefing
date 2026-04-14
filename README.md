@@ -4,6 +4,21 @@
 
 The design goal is not “clever automation”. The goal is boring reliability: local-first, explicit configuration, deterministic note paths, managed refreshes, and clear validation for anything that can break.
 
+## Documentation Map
+
+Start here, then go deeper only where needed:
+
+- [`README.md`](README.md)
+  High-level overview and quickstart.
+- [`docs/README.md`](docs/README.md)
+  Documentation map and recommended reading order.
+- [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md)
+  Full onboarding and configuration walkthrough.
+- [`docs/source-guides/README.md`](docs/source-guides/README.md)
+  Source-specific setup guides for Slack, Notion, local files, and the automatic previous-note source.
+- [`scripts/launchd/README.md`](scripts/launchd/README.md)
+  Automation setup after manual validation succeeds.
+
 ## Final Vision
 
 The finished system is intended to behave like this:
@@ -133,6 +148,13 @@ Implemented in v1:
 - `notion`: page/block extraction through the Notion API
 - `file`: local or synced files addressed by path
 
+Source-specific setup guides:
+
+- [`docs/source-guides/previous-note-source.md`](docs/source-guides/previous-note-source.md)
+- [`docs/source-guides/slack-source-setup.md`](docs/source-guides/slack-source-setup.md)
+- [`docs/source-guides/notion-source-setup.md`](docs/source-guides/notion-source-setup.md)
+- [`docs/source-guides/file-source-setup.md`](docs/source-guides/file-source-setup.md)
+
 Planned next source additions:
 
 - Google Docs / Google Drive documents
@@ -152,6 +174,14 @@ Supported variables today:
 
 New users should start with the full setup guide: [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md). It explains the install flow, what `init-series` does, how series matching works, and the most common first-run problems.
 
+After the base install works, use the dedicated source guides under [`docs/source-guides/`](docs/source-guides/README.md) instead of trying to infer Slack, Notion, or file setup from the config reference alone.
+
+For most first-time users, the safest path is:
+
+- get calendar, LLM, and one series working first
+- rely on the built-in previous-note source next
+- add Slack, Notion, or file sources one at a time only if they improve the briefing
+
 1. Run setup:
 
    ```bash
@@ -164,6 +194,7 @@ New users should start with the full setup guide: [`docs/setup-and-configuration
 2. Edit [`user_config/settings.toml`](user_config/settings.toml).
 3. Review the example series under [`user_config/examples/series`](user_config/examples/series), then create local meeting series files under [`user_config/series`](user_config/series), or bootstrap one with `uv run briefing init-series`.
 4. Create `~/.env.briefing` with the required secrets.
+   Only add the secrets for the sources you are actually using. See the source-specific guides for the exact Slack and Notion setup flow.
 5. Run validation:
 
    ```bash

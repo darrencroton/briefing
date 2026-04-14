@@ -10,6 +10,15 @@ It explains:
 - how to configure meeting series and source adapters
 - what the most common first-run problems look like
 
+Use this guide as the onboarding path.
+
+For source-specific step-by-step setup, use the dedicated guides under [`docs/source-guides/`](source-guides/README.md):
+
+- [`slack-source-setup.md`](source-guides/slack-source-setup.md)
+- [`notion-source-setup.md`](source-guides/notion-source-setup.md)
+- [`file-source-setup.md`](source-guides/file-source-setup.md)
+- [`previous-note-source.md`](source-guides/previous-note-source.md)
+
 ## What `briefing` does
 
 `briefing` watches Apple Calendar for meetings starting soon, matches only the meeting series you have explicitly configured, gathers context from a small set of sources, asks an LLM to draft a pre-meeting summary, and writes the result into a Markdown note.
@@ -33,6 +42,18 @@ Important behavior:
 - It does not overwrite user-entered content in `Meeting Notes` or `Actions`.
 - If a required source fails, note generation stops for that meeting.
 
+Current source adapters:
+
+- `previous_note`
+- `slack`
+- `notion`
+- `file`
+
+Practical recommendation:
+
+- get calendar plus `previous_note` working first
+- add only one extra source at a time after the base flow is working
+
 ## What the commands do
 
 The current CLI surface is intentionally small:
@@ -54,7 +75,7 @@ This is the fastest path to a working local install.
 ./scripts/setup.sh
 ```
 
-This does three things:
+This does four things:
 
 - installs dependencies
 - bootstraps `user_config/settings.toml` from tracked defaults if it is missing
@@ -338,6 +359,8 @@ Practical point:
 - `max_characters`
   Default text cap before truncation.
 
+For the full user setup flow, see [`source-guides/slack-source-setup.md`](source-guides/slack-source-setup.md).
+
 ### `[notion]`
 
 - `version`
@@ -347,10 +370,14 @@ Practical point:
 - `max_characters`
   Default text cap before truncation.
 
+For the full user setup flow, see [`source-guides/notion-source-setup.md`](source-guides/notion-source-setup.md).
+
 ### `[files]`
 
 - `max_characters`
   Default cap for local file source content.
+
+For the full user setup flow, see [`source-guides/file-source-setup.md`](source-guides/file-source-setup.md).
 
 ### `[logging]`
 
@@ -414,6 +441,10 @@ Practical examples:
 - use `calendar_names_any` to distinguish work vs personal calendars
 - combine groups when you want fewer false matches
 
+Good first principle:
+
+- prefer the fewest rules that still make the series match reliably
+
 ### Source blocks
 
 #### `slack`
@@ -438,6 +469,8 @@ slack:
 
 Use this when pre-meeting context often lives in a channel or DM thread.
 
+For the step-by-step setup flow, including tokens, scopes, and how to choose identifiers, see [`source-guides/slack-source-setup.md`](source-guides/slack-source-setup.md).
+
 #### `notion`
 
 Each entry supports:
@@ -457,6 +490,8 @@ notion:
 ```
 
 Use this when a recurring meeting relies on one or more standing Notion pages.
+
+For the full setup flow, including integration creation, page sharing, and page IDs, see [`source-guides/notion-source-setup.md`](source-guides/notion-source-setup.md).
 
 #### `files`
 
@@ -478,11 +513,33 @@ files:
 
 Use this for local Markdown, synced docs exported to files, or other stable local references.
 
+For the step-by-step setup flow, including path selection and validation expectations, see [`source-guides/file-source-setup.md`](source-guides/file-source-setup.md).
+
 ### Implicit previous-note source
 
 You do not configure this manually.
 
 `briefing` always tries to include the latest earlier note from the same series as `previous_note`. This is often the most useful source once the workflow has been running for a while.
+
+For guidance on making this source effective, see [`source-guides/previous-note-source.md`](source-guides/previous-note-source.md).
+
+## Choosing sources
+
+Choose sources based on where the real pre-meeting context already lives.
+
+- start with `previous_note`
+  This is often enough once the workflow has run more than once.
+- add `slack`
+  When important context lives in one channel or one DM thread.
+- add `notion`
+  When one or two standing Notion pages drive the meeting.
+- add `files`
+  When the relevant context already exists as stable Markdown or text files.
+
+Good default:
+
+- add one new source at a time
+- leave new sources as optional until they are proven stable
 
 ## Common setup patterns
 
@@ -598,5 +655,5 @@ If you want the shortest path to confidence, use this order:
 4. Simplify that series so it matches reliably.
 5. Run `uv run briefing run` close to a real upcoming meeting.
 6. Inspect the written note.
-7. Add Slack, Notion, or file sources only after the local-only flow works.
+7. Add Slack, Notion, or file sources only after the local-only flow works, using the guides under [`source-guides/`](source-guides/README.md).
 8. Install `launchd` automation last.

@@ -38,6 +38,13 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 - `.claude/` is local agent state/config and must stay untracked.
 - Do not commit personal absolute paths or machine-specific naming when a generic default will work.
 
+## Documentation Expectations
+
+- Keep `README.md` high-level and treat it as the entry point.
+- Keep `docs/setup-and-configuration-walkthrough.md` as the main onboarding guide.
+- Keep source-specific setup instructions under `docs/source-guides/`.
+- Prefer cross-references over repeating the same step-by-step instructions in multiple docs.
+
 ## Engineering Rules
 
 - Keep the CLI surface small and coherent.

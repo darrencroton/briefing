@@ -1,5 +1,13 @@
 # Automating `briefing` with `launchd`
 
+This guide is only for automation setup.
+
+Do the base onboarding first:
+
+- [`README.md`](../../README.md)
+- [`docs/setup-and-configuration-walkthrough.md`](../../docs/setup-and-configuration-walkthrough.md)
+- [`docs/source-guides/README.md`](../../docs/source-guides/README.md)
+
 Only install automation after these manual checks succeed:
 
 ```bash
