@@ -60,7 +60,6 @@ class ExecutionSettings:
 @dataclass(slots=True)
 class OutputSettings:
     meeting_notes_placeholder: str
-    actions_placeholder: str
 
 
 @dataclass(slots=True)

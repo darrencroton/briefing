@@ -40,7 +40,6 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
     }
     assert "## Briefing\n\n- First summary bullet" in note
     assert "## Meeting Notes\n\n- " in note
-    assert "## Actions\n\n- " in note
 
     updated = note.replace("## Meeting Notes\n\n- ", "## Meeting Notes\n\n- User note")
     refreshed = refresh_note(updated, "- New summary bullet")
@@ -85,12 +84,8 @@ def test_render_note_keeps_both_meridiems_when_range_crosses(app_settings, serie
 
 
 def test_note_lock_detection_ignores_placeholder(app_settings) -> None:
-    unlocked = (
-        "## Meeting Notes\n\n- \n\n## Actions\n\n- \n"
-    )
-    locked = (
-        "## Meeting Notes\n\n- Added an update\n\n## Actions\n\n- \n"
-    )
+    unlocked = "## Meeting Notes\n\n- \n"
+    locked = "## Meeting Notes\n\n- Added an update\n"
 
     assert note_is_locked(app_settings, unlocked) == (False, None)
     assert note_is_locked(app_settings, locked) == (True, "meeting_notes_edited")
@@ -100,11 +95,11 @@ def test_find_previous_note_uses_series_id_and_start(app_settings, series_config
     first = app_settings.paths.meeting_notes_dir / "2026-04-01-1000-cas-strategy.md"
     second = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-cas-strategy.md"
     first.write_text(
-        "---\nseries_id: cas-strategy\nstart: 2026-04-01T10:00:00+10:00\n---\n\n# First 10am–11am\n[[2026-04-01]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- One\n\n---\n## Meeting Notes\n\n- \n\n## Actions\n\n- \n",
+        "---\nseries_id: cas-strategy\nstart: 2026-04-01T10:00:00+10:00\n---\n\n# First 10am–11am\n[[2026-04-01]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- One\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
     second.write_text(
-        "---\nseries_id: cas-strategy\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Second 10am–11am\n[[2026-04-08]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n\n## Actions\n\n- \n",
+        "---\nseries_id: cas-strategy\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Second 10am–11am\n[[2026-04-08]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
     event = MeetingEvent(
@@ -123,13 +118,26 @@ def test_find_previous_note_uses_series_id_and_start(app_settings, series_config
 def test_summarize_previous_note_extracts_title_from_compact_time_heading(app_settings) -> None:
     note_path = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-barry.md"
     note_path.write_text(
-        "---\nseries_id: barry\nstart: 2026-04-08T17:15:00+10:00\n---\n\n# Barry 5:15–5:45pm\n[[2026-04-08]] [[Barry Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n\n## Actions\n\n- \n",
+        "---\nseries_id: barry\nstart: 2026-04-08T17:15:00+10:00\n---\n\n# Barry 5:15–5:45pm\n[[2026-04-08]] [[Barry Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
 
     summary = summarize_previous_note(note_path)
 
     assert "Title: Barry" in summary
+    assert "## Meeting Notes" not in summary
+
+
+def test_summarize_previous_note_keeps_non_empty_meeting_notes(app_settings) -> None:
+    note_path = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-followup.md"
+    note_path.write_text(
+        "---\nseries_id: followup\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Followup 10am–11am\n[[2026-04-08]] [[Followup Meeting]]\n\n---\n## Briefing\n\n- Review draft\n\n---\n## Meeting Notes\n\n- Send revised figures before Friday\n",
+        encoding="utf-8",
+    )
+
+    summary = summarize_previous_note(note_path)
+
+    assert "## Meeting Notes\n- Send revised figures before Friday" in summary
 
 
 def test_normalize_summary_bullets_converts_lists() -> None:

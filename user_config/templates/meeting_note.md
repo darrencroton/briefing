@@ -9,7 +9,3 @@
 ## Meeting Notes
 
 {{MEETING_NOTES_PLACEHOLDER}}
-
-## Actions
-
-{{ACTIONS_PLACEHOLDER}}

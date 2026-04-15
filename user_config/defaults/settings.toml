@@ -25,7 +25,6 @@ source_timeout_seconds = 120
 
 [output]
 meeting_notes_placeholder = "- "
-actions_placeholder = "- "
 
 [llm]
 provider = "claude_cli"

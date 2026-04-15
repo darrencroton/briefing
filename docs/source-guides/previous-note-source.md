@@ -13,7 +13,7 @@ If you want the short version first:
 1. [Make sure one recurring meeting consistently matches one `series_id`](#step-1-make-the-series-match-reliably).
 2. [Do not change that `series_id` after notes have been created](#step-2-keep-series_id-stable).
 3. [Let `briefing` create the first note for that series](#step-3-let-the-first-note-be-created).
-4. [Keep using the normal `Briefing`, `Meeting Notes`, and `Actions` sections](#step-4-keep-the-managed-note-structure-intact).
+4. [Keep using the normal `Briefing` and `Meeting Notes` sections](#step-4-keep-the-managed-note-structure-intact).
 5. [On the next occurrence, confirm the new note clearly reflects the previous one](#step-5-check-that-it-is-working).
 
 ## What It Does
@@ -25,7 +25,6 @@ If it finds one, it extracts the high-value parts of that note:
 - the note title
 - the previous `Briefing`
 - the previous `Meeting Notes`
-- the previous `Actions`
 
 That material is then passed into the next run as source context.
 
@@ -97,9 +96,8 @@ The previous-note summariser looks at the note structure that `briefing` writes:
 
 - `## Briefing`
 - `## Meeting Notes`
-- `## Actions`
 
-Normal user editing inside `Meeting Notes` and `Actions` is expected and useful. That content is part of what makes the previous-note source valuable.
+Normal user editing inside `Meeting Notes` is expected and useful. That content is part of what makes the previous-note source valuable.
 
 What matters is keeping the note as a normal `briefing` meeting note rather than turning it into an unrelated document format.
 
@@ -141,7 +139,7 @@ For a new install:
 
 1. get one recurring series matching correctly
 2. let `briefing` create the first note
-3. attend the meeting and add useful notes/actions
+3. attend the meeting and add useful notes
 4. let the next occurrence reuse that material
 5. only then decide whether extra sources are actually necessary
 

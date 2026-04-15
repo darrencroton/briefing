@@ -52,7 +52,7 @@ The repository currently implements the core v1 system:
 - occurrence state keyed by `event_uid + start_timestamp`
 - deterministic note filenames on first creation
 - managed refresh of only the pre-meeting summary block
-- automatic lockout once `Meeting Notes` or `Actions` have been edited
+- automatic lockout once `Meeting Notes` have been edited
 - source adapters for previous note, Slack, Notion, and local files
 - Claude CLI provider abstraction with `sonnet` as the safe default model alias
 - machine-readable run diagnostics under `state/runs/`
@@ -81,7 +81,7 @@ launchd
 - Stable series matching: a series is matched by explicit rules, not only by the event title.
 - Stable occurrence identity: state is stored by calendar UID plus start timestamp, so title changes do not orphan notes.
 - Managed refresh only: automation updates only the generated summary block.
-- User edits win: once notes or actions are touched, automation stops rewriting that occurrence.
+- User edits win: once meeting notes are touched, automation stops rewriting that occurrence.
 - Required-vs-optional sources: required source failures block note generation; optional source failures are logged and omitted.
 
 ## Repository Layout

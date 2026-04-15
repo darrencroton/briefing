@@ -35,7 +35,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
         encoding="utf-8",
     )
     (template_dir / "meeting_note.md").write_text(
-        "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n\n## Actions\n\n{{ACTIONS_PLACEHOLDER}}\n",
+        "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n",
         encoding="utf-8",
     )
     env_file = tmp_path / ".env.briefing"
@@ -66,7 +66,6 @@ def app_settings(tmp_path: Path) -> AppSettings:
         execution=ExecutionSettings(max_parallel_sources=4, source_timeout_seconds=5),
         output=OutputSettings(
             meeting_notes_placeholder="- ",
-            actions_placeholder="- ",
         ),
         llm=LLMSettings(
             provider="claude_cli",

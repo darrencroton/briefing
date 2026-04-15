@@ -39,7 +39,7 @@ Important behavior:
 
 - `briefing` does nothing for meetings that are not explicitly configured.
 - It updates only the managed summary block.
-- It does not overwrite user-entered content in `Meeting Notes` or `Actions`.
+- It does not overwrite user-entered content in `Meeting Notes`.
 - If a required source fails, note generation stops for that meeting.
 
 Current source adapters:
@@ -313,11 +313,10 @@ Typical use cases:
 ### `[output]`
 
 - `meeting_notes_placeholder`
-- `actions_placeholder`
 
-These drive the managed note behavior. In normal use, you usually leave them alone.
+This drives the managed note behavior. In normal use, you usually leave it alone.
 
-`briefing` only refreshes the `## Briefing` section. It treats edits to `Meeting Notes` or `Actions` as a lock signal and stops rewriting that occurrence.
+`briefing` only refreshes the `## Briefing` section. It treats edits to `Meeting Notes` as a lock signal and stops rewriting that occurrence.
 
 ### `[llm]`
 
@@ -623,7 +622,7 @@ Usually one of:
 - no meeting starts between `window_min_minutes` and `window_max_minutes`
 - no series matched the event
 - more than one series matched the event
-- the note was already locked because `Meeting Notes` or `Actions` were edited
+- the note was already locked because `Meeting Notes` were edited
 - the meeting had already started
 
 ### A series exists but never matches
@@ -632,7 +631,7 @@ Review the YAML match groups. The most common issue is over-constraining the ser
 
 ### A note was created once but no longer refreshes
 
-This is usually intentional. If `Meeting Notes` or `Actions` differ from their placeholders, `briefing` treats the occurrence as user-owned and stops rewriting it.
+This is usually intentional. If `Meeting Notes` differs from its placeholder, `briefing` treats the occurrence as user-owned and stops rewriting it.
 
 ## Before enabling automation
 

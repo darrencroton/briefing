@@ -34,7 +34,6 @@ def render_note(
             "SERIES_LINK": f"{series.display_name} Meeting",
             "BRIEFING_BLOCK": briefing_block,
             "MEETING_NOTES_PLACEHOLDER": settings.output.meeting_notes_placeholder,
-            "ACTIONS_PLACEHOLDER": settings.output.actions_placeholder,
         },
     )
 
@@ -87,20 +86,20 @@ def _strip_slack_channel_hashes(text: str) -> str:
     )
 
 
+def _section_has_user_content(section_text: str) -> bool:
+    """Treat empty bullet placeholders as no content for previous-note carryover."""
+    return _normalize_section_value(section_text) not in {"", "-"}
+
+
 def note_is_locked(settings: AppSettings, note_text: str) -> tuple[bool, str | None]:
     """Determine whether user note sections have been edited."""
     if not note_text.strip():
         return False, None
     meeting_notes = extract_section(note_text, "Meeting Notes")
-    actions = extract_section(note_text, "Actions")
     if _normalize_section_value(meeting_notes) != _normalize_section_value(
         settings.output.meeting_notes_placeholder
     ):
         return True, "meeting_notes_edited"
-    if _normalize_section_value(actions) != _normalize_section_value(
-        settings.output.actions_placeholder
-    ):
-        return True, "actions_edited"
     return False, None
 
 
@@ -155,15 +154,12 @@ def summarize_previous_note(path: Path) -> str:
     _, body = parse_frontmatter(text)
     summary = extract_section(body, "Briefing")
     meeting_notes = extract_section(body, "Meeting Notes")
-    actions = extract_section(body, "Actions")
     title = _extract_title(body) or path.name
     parts = [f"Title: {title}"]
     if summary:
         parts.append("## Briefing\n" + summary)
-    if meeting_notes:
+    if _section_has_user_content(meeting_notes):
         parts.append("## Meeting Notes\n" + meeting_notes)
-    if actions:
-        parts.append("## Actions\n" + actions)
     return "\n\n".join(parts)
 
 
