@@ -10,6 +10,7 @@ state/occurrences/*.json
 state/runs/*.json
 tmp/
 user_config/*
+.env.briefing
 !user_config/defaults/
 !user_config/defaults/**
 !user_config/examples/
