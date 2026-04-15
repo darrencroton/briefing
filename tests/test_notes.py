@@ -146,3 +146,11 @@ def test_normalize_summary_bullets_preserves_single_blank_lines_between_groups()
     assert normalized == (
         "- Open action\n\n- Previous note context\n\n- Slack update"
     )
+
+
+def test_normalize_summary_bullets_strips_channel_style_hashes_but_keeps_issue_numbers() -> None:
+    normalized = normalize_summary_bullets(
+        "Per Slack (#general): follow up in #jayde-phd after issue #42"
+    )
+
+    assert normalized == "- Per Slack (general): follow up in jayde-phd after issue #42"

@@ -37,9 +37,9 @@ class SlackClient:
         """Fetch a channel by ID or name."""
         channel = self._resolve_channel(channel_ref)
         channel_id = str(channel["id"])
-        channel_name = str(channel.get("name") or channel_ref)
+        channel_name = _clean_channel_name(str(channel.get("name") or channel_ref))
         messages = self._fetch_messages(channel_id, oldest)
-        return f"Slack #{channel_name}", self._format_digest(channel_name, messages, oldest)
+        return f"Slack channel {channel_name}", self._format_digest(f"channel {channel_name}", messages, oldest)
 
     def fetch_dm_digest(self, user_id: str, oldest: datetime) -> tuple[str, str]:
         """Fetch a DM conversation with a user."""
@@ -186,10 +186,19 @@ def clean_slack_text(client: SlackClient, text: str) -> str:
         lambda match: f"@{client.resolve_user(match.group(1))}",
         text,
     )
-    text = re.sub(r"<#([CGD][A-Z0-9]+)\|([^>]+)>", r"#\2", text)
+    text = re.sub(
+        r"<#([CGD][A-Z0-9]+)\|([^>]+)>",
+        lambda match: _clean_channel_name(match.group(2)),
+        text,
+    )
     text = re.sub(r"<(https?://[^|>]+)\|([^>]+)>", r"[\2](\1)", text)
     text = re.sub(r"<(https?://[^>]+)>", r"\1", text)
     return text
+
+
+def _clean_channel_name(name: str) -> str:
+    """Return a Slack channel name without a leading hash."""
+    return name.lstrip("#")
 
 
 def collect_slack_sources(
@@ -228,7 +237,7 @@ def collect_slack_sources(
             results.append(
                 SourceResult(
                     source_type="slack",
-                    label=f"Slack #{channel_ref}",
+                    label=f"Slack channel {_clean_channel_name(channel_ref)}",
                     content="",
                     required=config.required,
                     status="error",

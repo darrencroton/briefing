@@ -61,7 +61,7 @@ def normalize_summary_bullets(summary_bullets: str) -> str:
                 bullets.append("")
             continue
 
-        cleaned = line.strip()
+        cleaned = _strip_slack_channel_hashes(line.strip())
         if cleaned.startswith("- "):
             bullets.append(cleaned)
         elif cleaned.startswith("* "):
@@ -76,6 +76,15 @@ def normalize_summary_bullets(summary_bullets: str) -> str:
     if not bullets:
         bullets = ["- "]
     return "\n".join(bullets)
+
+
+def _strip_slack_channel_hashes(text: str) -> str:
+    """Remove leading hashes from channel-style tokens so Obsidian does not treat them as tags."""
+    return re.sub(
+        r"(^|[\s(])#([a-z][a-z0-9._-]*)(?=$|[\s),.:;!?])",
+        lambda match: f"{match.group(1)}{match.group(2)}",
+        text,
+    )
 
 
 def note_is_locked(settings: AppSettings, note_text: str) -> tuple[bool, str | None]:
