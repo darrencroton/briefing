@@ -10,6 +10,21 @@ Use Slack when relevant meeting context lives in:
 
 `briefing` reads recent message history and turns it into a digest for the LLM. It does not post back to Slack.
 
+## Quickstart
+
+If you want the short version first, do these in order:
+
+1. [Choose the exact channels or one-to-one DMs you want `briefing` to read](#1-decide-which-slack-conversations-matter).
+2. [Open Slack's app management site at `https://api.slack.com/apps` and create a new app from scratch for the correct workspace](#2-create-a-slack-app-in-the-correct-workspace).
+3. [In `OAuth & Permissions`, add the required entries under `User Token Scopes`](#3-add-the-correct-user-token-scopes).
+4. [Install the app to the workspace and copy the installed `User OAuth Token`](#4-install-the-app-and-copy-the-user-oauth-token).
+5. [Put that token in `~/.env.briefing` as `SLACK_USER_TOKEN=...`](#5-save-the-token-in-envbriefing).
+6. [Add `channel_refs` and/or `dm_user_ids` to the right series YAML file](#7-update-the-series-yaml).
+7. [Run `uv run briefing validate`](#8-validate).
+8. [Run a real `uv run briefing run`](#9-test-with-a-real-run).
+
+If any Slack screen looks unfamiliar, keep going. The detailed steps below name the exact site, sidebar entry, token label, and fields that matter.
+
 ## Before You Start
 
 Make sure all of these are already true:
@@ -19,24 +34,37 @@ Make sure all of these are already true:
 - you already have a series YAML file under `user_config/series/`
 - you are signed into the Slack workspace on your Mac
 
-## What You Need From Slack
+## What `briefing` Actually Needs From Slack
 
-`briefing` expects a Slack user token in `~/.env.briefing`:
+`briefing` needs exactly two kinds of Slack data:
+
+1. An installed Slack user token in `~/.env.briefing`:
 
 ```text
 SLACK_USER_TOKEN=your_slack_user_token_here
 ```
 
-It also needs one or both of:
+2. Conversation identifiers in the series YAML:
 
 - channel references under `sources.slack.channel_refs`
 - Slack user IDs under `sources.slack.dm_user_ids`
 
-Channel references can be channel names or channel IDs. For long-term stability, channel IDs are safer because channel names can change.
+Important distinctions:
 
-Direct messages must use Slack user IDs, not display names.
+- Use the installed `User OAuth Token` from Slack's `OAuth & Permissions` page.
+- Do not use an app-level token such as `xapp-...`.
+- Do not use a bot token such as `xoxb-...`.
+- Do not use `Client ID`, `Client Secret`, `Signing Secret`, or `Verification Token`.
 
-## Step 1. Decide Which Slack Conversations Matter
+Slack's token documentation distinguishes user, bot, and app-level tokens. `briefing` uses a user token because it reads Slack as the installing user. In Slack's current UI that token is shown as the installed `User OAuth Token`, and Slack user tokens typically start with `xoxp-`. See Slack's official token docs: [Slack token types](https://docs.slack.dev/authentication/tokens/).
+
+What the other Slack secrets are for:
+
+- `Client ID` and `Client Secret`: needed for a public OAuth flow. `briefing` does not use Slack OAuth callbacks.
+- `Signing Secret` and `Verification Token`: needed when Slack sends HTTP requests to your app. `briefing` does not receive Slack events.
+- `App-Level Tokens`: used for different Slack APIs. `briefing` does not use them.
+
+## 1. Decide Which Slack Conversations Matter
 
 Before touching configuration, write down the exact conversations you want the briefing to read.
 
@@ -48,62 +76,75 @@ Good candidates:
 
 Avoid starting with too many channels. A smaller, higher-signal set usually produces better briefings and is easier to debug.
 
-## Step 2. Create A Slack App For Your Workspace
+## 2. Create A Slack App In The Correct Workspace
 
-Create a Slack app in the workspace that holds the conversations you want to read.
+Open Slack's app management site in your browser:
 
-Suggested approach:
+- [https://api.slack.com/apps](https://api.slack.com/apps)
 
-1. Open the Slack app management site for your workspace.
-2. Create a new app from scratch.
-3. Give it a clear local-use name such as `Briefing Local`.
-4. Select the Slack workspace you want `briefing` to read from.
+Then do this:
 
-This app is only there to obtain a user token with the right scopes.
+1. Sign in if Slack asks you to.
+2. Click `Create New App`.
+3. Choose `From scratch`.
+4. Enter a simple name such as `Briefing Local`.
+5. Choose the Slack workspace that contains the channels or DMs you want `briefing` to read.
+6. Finish the creation flow.
 
-## Step 3. Add The User Token Scopes You Need
+You should now be on the new app's settings pages in Slack's browser UI.
 
-Add only the scopes that match the sources you plan to use.
+If your workspace blocks app creation, ask a workspace admin or owner to create the app or allow local-use apps.
 
-For public channels:
+## 3. Add The Correct User Token Scopes
 
-- `channels:read`
-- `channels:history`
+In the app settings sidebar:
 
-For private channels:
+1. Click `OAuth & Permissions`.
+2. Scroll to the `Scopes` section.
+3. Under `User Token Scopes`, click `Add an OAuth Scope`.
+4. Add only the scopes that match the conversations you plan to read.
 
-- `groups:read`
-- `groups:history`
+Use these scopes:
 
-For direct messages:
+- Public channels: `channels:read`, `channels:history`
+- Private channels: `groups:read`, `groups:history`
+- One-to-one DMs: `im:history`, `im:write`
+- Human-readable participant names in digests: `users:read`
 
-- `im:history`
-- `im:write`
+Why `briefing` needs them:
 
-For readable names in digests:
-
-- `users:read`
-
-Why these matter in `briefing`:
-
-- it resolves channel references
-- it opens direct-message conversations from a user ID
+- it resolves channel names or IDs
+- it opens a DM from a Slack user ID
 - it reads conversation history
-- it resolves human-readable Slack member names for the digest
+- it resolves readable Slack member names for the digest
 
-If you only need channels, you can skip the DM-related scopes.
+If you only need channels, you can skip the DM scopes. If you only need DMs, you can skip the channel scopes.
 
-## Step 4. Install The App And Copy The User Token
+If you add or change scopes after installing the app, return to `OAuth & Permissions` and run `Install to Workspace` again so Slack issues an updated installed token.
 
-Install the app to the workspace, then copy the user token Slack provides for the installing user.
+Slack's official guide for this page is here: [Using OAuth scopes](https://docs.slack.dev/authentication/installing-with-oauth#using-oauth-scopes).
 
-Put it in `~/.env.briefing`:
+## 4. Install The App And Copy The User OAuth Token
 
-```text
-SLACK_USER_TOKEN=your_slack_user_token_here
-```
+Stay on the same `OAuth & Permissions` page.
 
-If `~/.env.briefing` already exists, just add the new line and keep any existing variables such as `NOTION_TOKEN`.
+Then:
+
+1. Scroll to the top `OAuth Tokens` area.
+2. Click `Install to Workspace`.
+3. Approve the requested permissions as yourself.
+4. Return to `OAuth & Permissions`.
+5. Copy the installed `User OAuth Token`.
+
+That installed user token is the value `briefing` needs.
+
+Do not copy any of these instead:
+
+- `Bot User OAuth Token`
+- `Client Secret`
+- `Signing Secret`
+- `Verification Token`
+- any app-level token
 
 Important practical point:
 
@@ -111,30 +152,67 @@ Important practical point:
 - if that user cannot see a private channel, `briefing` cannot read it either
 - if that user leaves a channel later, Slack access for that source can break
 
-## Step 5. Collect The Conversation Identifiers
+## 5. Save The Token In `~/.env.briefing`
 
-### For channels
+Put the token in `~/.env.briefing`:
 
-Pick one of these approaches:
+```text
+SLACK_USER_TOKEN=your_slack_user_token_here
+```
 
-- easiest: use the Slack channel name, for example `eng-leads`
-- more stable: use the Slack channel ID
+If `~/.env.briefing` already exists, add or update that line and keep any existing variables such as `NOTION_TOKEN`.
 
-If you are just getting started, a channel name is fine. If the channel might be renamed, switch to the ID later.
+## 6. Collect The Conversation Identifiers
 
-### For direct messages
+### Channels
 
-Open the person’s Slack profile and copy their member ID. Slack user IDs usually look like `U0123ABC456`.
+You can configure channels by name or by channel ID.
 
-Use the member ID, not:
+- Easiest: use the current channel name exactly as it appears in Slack, without the leading `#`
+- More stable: use the channel ID
 
-- the person’s display name
-- the `@handle`
+Recommended first-time path:
+
+- start with the channel name if you just need to get working
+- switch to the channel ID later if the channel may be renamed
+
+How to get a channel ID:
+
+1. Open the channel in Slack.
+2. Open or copy the channel link in the Slack web UI.
+3. Look at the URL. Slack channel URLs include `/archives/CHANNEL_ID`.
+4. Copy the final `C...` or `G...` identifier.
+
+Examples:
+
+- channel name: `eng-leads`
+- channel ID: `C0123456789`
+
+### Direct Messages
+
+For DMs, `briefing` needs the other person's Slack user ID.
+
+Use the person's Slack member ID, not:
+
+- the person's display name
+- their `@handle`
 - the DM conversation ID
 
-`briefing` opens the DM from the Slack user ID each time it runs.
+How to get the user ID:
 
-## Step 6. Update The Series YAML
+1. Open the person's profile in Slack.
+2. Use the profile actions menu and look for `Copy member ID` or an equivalent user-ID action.
+3. Copy the `U...` identifier.
+
+Example:
+
+- Slack user ID: `U0123ABC456`
+
+`briefing` uses that user ID to open the one-to-one DM each time it runs.
+
+Slack's help center has the terminology here: [Find your Slack workspace or member ID](https://slack.com/help/articles/360035692513).
+
+## 7. Update The Series YAML
 
 Open the relevant file under `user_config/series/` and add a Slack block.
 
@@ -182,7 +260,7 @@ Recommended default:
 
 Only consider `required: true` if the meeting briefing would be actively misleading without Slack and you are comfortable blocking note generation when Slack cannot be collected.
 
-## Step 7. Validate
+## 8. Validate
 
 Run:
 
@@ -200,8 +278,9 @@ It does not confirm:
 - that every channel reference is correct
 - that every DM user ID is correct
 - that the token has access to the specific private channels you chose
+- that you copied a user token with all required scopes for every configured conversation type
 
-## Step 8. Test With A Real Run
+## 9. Test With A Real Run
 
 Run:
 
@@ -232,17 +311,33 @@ Once that works, add a DM or tighten the lookback window.
 
 ## Common Problems
 
+### I created a Slack app, but I only see `Client ID`, `Client Secret`, `Signing Secret`, or app-level tokens
+
+You are looking in the wrong place. Go to the app sidebar entry `OAuth & Permissions`, add the required entries under `User Token Scopes`, install the app to the workspace, then copy the installed `User OAuth Token`.
+
 ### `validate` says Slack token is missing
 
 Add `SLACK_USER_TOKEN` to `~/.env.briefing` and rerun validation.
 
 ### `validate` says the Slack token failed
 
-The token is wrong, expired, revoked, or missing a valid workspace installation. Re-copy the installed user token and rerun.
+The token is wrong, revoked, expired, copied incorrectly, or you copied something other than the installed user token. Re-copy the installed `User OAuth Token` and rerun.
 
 ### The run fails for one private channel
 
-The installing user usually is not a member of that private channel, or the channel reference is wrong.
+Usually one of:
+
+- the installing user is not a member of that private channel
+- the channel reference is wrong
+- the token is missing one of the private-channel scopes
+
+### The run fails for a DM
+
+Usually one of:
+
+- you used a display name or DM conversation ID instead of the other person's `U...` user ID
+- the token is missing `im:history` or `im:write`
+- the user token cannot access that DM in the current workspace
 
 ### The run succeeds but the Slack content is noisy
 

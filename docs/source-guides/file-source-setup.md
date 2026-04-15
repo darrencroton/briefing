@@ -11,6 +11,16 @@ Use the file source when important meeting context already exists as text on dis
 
 The file source is often the easiest additional source because it does not require an external API token.
 
+## Quickstart
+
+If you want the short version first:
+
+1. [Choose one small, relevant text file](#step-1-choose-the-exact-files).
+2. [Confirm the exact filesystem path on the Mac that runs `briefing`](#step-2-confirm-the-file-path-on-disk).
+3. [Add that path under `sources.files` in the series YAML](#step-3-update-the-series-yaml).
+4. [Run `uv run briefing validate`](#step-4-validate).
+5. [Run a real `uv run briefing run` and confirm the file adds signal rather than noise](#step-5-test-with-a-real-run).
+
 ## Before You Start
 
 Make sure all of these are already true:
@@ -50,6 +60,12 @@ If you are unsure, start with the smallest file that would still help you prepar
 ## Step 2. Confirm The File Path On Disk
 
 Open the file on your Mac and confirm the actual filesystem path.
+
+Practical ways to get the path:
+
+- in Finder, select the file and use `Get Info`
+- in Finder, hold `Option`, right-click the file, and use `Copy ... as Pathname`
+- if the file is already inside this repo, use the repo-relative path
 
 `briefing` supports paths such as:
 

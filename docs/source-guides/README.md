@@ -2,6 +2,8 @@
 
 These guides explain how to get each current source working in `briefing` without guessing.
 
+Each guide starts with a short quickstart, then a detailed step-by-step section for first-time setup.
+
 Use them after the main install is already working:
 
 - run `./scripts/setup.sh`

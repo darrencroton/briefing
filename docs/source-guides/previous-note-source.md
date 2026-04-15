@@ -6,6 +6,16 @@ Unlike Slack, Notion, and file sources, you do not configure this source manuall
 
 It is also always non-blocking. If no earlier note exists yet, the run still continues normally.
 
+## Quickstart
+
+If you want the short version first:
+
+1. [Make sure one recurring meeting consistently matches one `series_id`](#step-1-make-the-series-match-reliably).
+2. [Do not change that `series_id` after notes have been created](#step-2-keep-series_id-stable).
+3. [Let `briefing` create the first note for that series](#step-3-let-the-first-note-be-created).
+4. [Keep using the normal `Briefing`, `Meeting Notes`, and `Actions` sections](#step-4-keep-the-managed-note-structure-intact).
+5. [On the next occurrence, confirm the new note clearly reflects the previous one](#step-5-check-that-it-is-working).
+
 ## What It Does
 
 For each meeting occurrence, `briefing` looks for the most recent earlier note with the same `series_id`.
@@ -62,6 +72,8 @@ That means:
 
 - changing `display_name` is usually fine
 - changing `series_id` breaks the chain to earlier notes
+
+If you are inspecting an older note directly, look in the frontmatter at the top of the Markdown file for the stored `series_id`.
 
 If you need to rename a series for presentation reasons, prefer changing `display_name` first and leaving `series_id` alone.
 
