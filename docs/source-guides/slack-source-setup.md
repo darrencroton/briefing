@@ -190,12 +190,13 @@ How to get a channel ID:
 1. Open the channel in Slack.
 2. Open or copy the channel link in the Slack web UI.
 3. Look at the URL. Slack channel URLs include `/archives/CHANNEL_ID`.
-4. Copy the final `C...` or `G...` identifier.
+4. Copy the final conversation ID exactly as Slack shows it.
 
 Examples:
 
 - channel name: `eng-leads`
 - channel ID: `C0123456789`
+- channel ID: `G0123456789`
 
 ### Direct Messages
 
@@ -217,7 +218,7 @@ How to get the conversation ID:
 1. Open the DM conversation in Slack.
 2. Open or copy the conversation link in the Slack web UI.
 3. Look at the URL. Slack DM conversation URLs include `/archives/CONVERSATION_ID`.
-4. Copy the final `D...` or `G...` identifier.
+4. Copy the final conversation ID exactly as Slack shows it.
 
 Examples:
 
