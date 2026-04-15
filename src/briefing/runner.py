@@ -183,6 +183,7 @@ def process_event(
     prompt = render_summary_prompt(
         prompt_template.read_text(encoding="utf-8"),
         event,
+        series,
         usable_sources,
         now,
     )
