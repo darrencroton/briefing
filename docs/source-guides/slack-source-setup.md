@@ -168,6 +168,14 @@ If `~/.env.briefing` already exists, add or update that line and keep any existi
 
 You can configure channels by name or by channel ID.
 
+Public and private channels use the same YAML field: `sources.slack.channel_refs`.
+
+The only setup difference is access:
+
+- public channels need the public-channel scopes
+- private channels need the private-channel scopes
+- the installing user must already be able to see the private channel
+
 - Easiest: use the current channel name exactly as it appears in Slack, without the leading `#`
 - More stable: use the channel ID
 
@@ -226,6 +234,40 @@ sources:
     dm_user_ids:
       - U0123ABC456
 ```
+
+Example with a private channel by ID:
+
+```yaml
+sources:
+  slack:
+    channel_refs:
+      - G0123456789
+```
+
+If you want multiple channels, list each one as a separate YAML list item:
+
+```yaml
+sources:
+  slack:
+    channel_refs:
+      - general
+      - jayde-phd
+    dm_user_ids:
+      - U0ADBSRXXXX
+    required: false
+```
+
+Inline YAML lists also work if you prefer that style:
+
+```yaml
+sources:
+  slack:
+    channel_refs: [general, jayde-phd]
+    dm_user_ids: [U0ADBSRXXXX]
+    required: false
+```
+
+Do not write multiple channels as one comma-separated string without the surrounding `[` `]`, because that would be a single YAML string rather than a list.
 
 Useful optional fields:
 
