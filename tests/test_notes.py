@@ -7,6 +7,7 @@ from briefing.notes import (
     find_previous_note,
     normalize_summary_bullets,
     note_is_locked,
+    parse_frontmatter,
     refresh_note,
     render_note,
     summarize_previous_note,
@@ -30,6 +31,13 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
         series_config,
         "- First summary bullet",
     )
+    frontmatter, _ = parse_frontmatter(note)
+
+    assert frontmatter == {
+        "title": "CAS Strategy Meeting 10–11am",
+        "series_id": "cas-strategy",
+        "start": "2026-04-13T10:00:00+10:00",
+    }
     assert "## Briefing\n\n- First summary bullet" in note
     assert "## Meeting Notes\n\n- " in note
     assert "## Actions\n\n- " in note
@@ -54,9 +62,11 @@ def test_render_note_uses_compact_same_meridiem_time_window(app_settings, series
     template = (app_settings.paths.template_dir / "meeting_note.md").read_text(encoding="utf-8")
 
     note = render_note(app_settings, template, event, series_config, "- First summary bullet")
+    frontmatter, _ = parse_frontmatter(note)
 
     assert "# Barry 5:15–5:45pm" in note
     assert "# Barry 5:15pm–5:45pm" not in note
+    assert frontmatter["title"] == "Barry 5:15–5:45pm"
 
 
 def test_render_note_keeps_both_meridiems_when_range_crosses(app_settings, series_config) -> None:

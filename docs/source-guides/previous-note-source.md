@@ -66,14 +66,16 @@ If the match rules are too loose, the wrong meeting can match the series. If the
 
 ## Step 2. Keep `series_id` Stable
 
-`briefing` finds previous notes by looking at the `series_id` stored in note frontmatter.
+`briefing` stores note metadata in frontmatter, including `title`, `series_id`, and `start`.
+
+For previous-note continuity, it uses the stored `series_id` and `start`.
 
 That means:
 
 - changing `display_name` is usually fine
 - changing `series_id` breaks the chain to earlier notes
 
-If you are inspecting an older note directly, look in the frontmatter at the top of the Markdown file for the stored `series_id`.
+If you are inspecting an older note directly, look in the frontmatter at the top of the Markdown file for the stored `series_id` and `start`.
 
 If you need to rename a series for presentation reasons, prefer changing `display_name` first and leaving `series_id` alone.
 

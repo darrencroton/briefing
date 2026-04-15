@@ -22,8 +22,8 @@ def render_note(
     summary_bullets: str,
 ) -> str:
     """Render a complete note from tracked template plus deterministic metadata."""
-    frontmatter = _build_frontmatter(event, series)
     heading = _build_heading(event)
+    frontmatter = _build_frontmatter(event, series, heading)
     briefing_block = build_briefing_block(summary_bullets)
     return render_template(
         template_text,
@@ -161,8 +161,10 @@ def summarize_previous_note(path: Path) -> str:
 def _build_frontmatter(
     event: MeetingEvent,
     series: SeriesConfig,
+    title: str,
 ) -> str:
     payload = {
+        "title": title,
         "series_id": series.series_id,
         "start": event.start.isoformat(),
     }
