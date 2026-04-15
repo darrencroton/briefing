@@ -8,7 +8,7 @@ Use them after the main install is already working:
 
 - run `./scripts/setup.sh`
 - edit `user_config/settings.toml`
-- confirm `uv run briefing validate` works for calendar and LLM
+- confirm `uv run briefing validate` works for calendar and your selected LLM CLI
 - create or review at least one series file in `user_config/series/`
 
 ## Choose The Right Guide

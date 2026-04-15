@@ -120,6 +120,17 @@ class AppSettings:
     logging: LoggingSettings
 
 
+_SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini")
+_LEGACY_LLM_PROVIDERS = {"claude_cli": "claude"}
+_VALID_LLM_EFFORTS = ("low", "medium", "high")
+_DEFAULT_LLM_COMMANDS = {
+    "claude": "claude",
+    "codex": "codex",
+    "copilot": "copilot",
+    "gemini": "gemini",
+}
+
+
 def load_settings(repo_root: Path | None = None) -> AppSettings:
     """Load the main settings file."""
     if repo_root is None:
@@ -163,7 +174,7 @@ def load_settings(repo_root: Path | None = None) -> AppSettings:
             calendar=CalendarSettings(**calendar),
             execution=ExecutionSettings(**data["execution"]),
             output=OutputSettings(**data["output"]),
-            llm=LLMSettings(**data["llm"]),
+            llm=LLMSettings(**_parse_llm_settings(data["llm"])),
             slack=SlackSettings(**data["slack"]),
             notion=NotionSettings(**data["notion"]),
             files=FilesSettings(**data["files"]),
@@ -264,6 +275,38 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _parse_llm_settings(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise SettingsError("Invalid settings file: [llm] must be a table.")
+
+    provider = str(raw.get("provider", "claude")).strip().lower()
+    provider = _LEGACY_LLM_PROVIDERS.get(provider, provider)
+    if provider not in _SUPPORTED_LLM_PROVIDERS:
+        raise SettingsError(
+            "Invalid settings file: [llm].provider must be one of "
+            f"{', '.join(_SUPPORTED_LLM_PROVIDERS)}."
+        )
+
+    raw_command = raw.get("command")
+    command = str(raw_command).strip() if raw_command is not None else ""
+    if not command:
+        command = _DEFAULT_LLM_COMMANDS[provider]
+
+    raw_effort = raw.get("effort")
+    effort = str(raw_effort).strip().lower() if raw_effort is not None else ""
+    if effort and effort not in _VALID_LLM_EFFORTS:
+        raise SettingsError(
+            "Invalid settings file: [llm].effort must be blank or one of "
+            f"{', '.join(_VALID_LLM_EFFORTS)}."
+        )
+
+    parsed = dict(raw)
+    parsed["provider"] = provider
+    parsed["command"] = command
+    parsed["effort"] = effort
+    return parsed
 
 
 def _coerce_string_list(value: Any, section: str, key: str) -> list[str]:

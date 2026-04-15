@@ -68,7 +68,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
             meeting_notes_placeholder="- ",
         ),
         llm=LLMSettings(
-            provider="claude_cli",
+            provider="claude",
             command="claude",
             model="sonnet",
             effort="",

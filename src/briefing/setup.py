@@ -28,6 +28,7 @@ class SetupSummary:
     created_runtime_dirs: tuple[Path, ...]
     provider_validated: bool
     provider_warning: str | None
+    llm_provider: str
 
 
 def ensure_runtime_directories(project_root: Path | None = None) -> tuple[Path, ...]:
@@ -61,6 +62,7 @@ def prepare_workspace(project_root: Path | None = None) -> SetupSummary:
                     "Setup bootstrapped the default local configuration, so this check was not treated as fatal.\n"
                     "Edit user_config/settings.toml if needed, then rerun ./scripts/setup.sh or run `uv run briefing validate`."
                 ),
+                llm_provider=settings.llm.provider,
             )
         raise ValueError(f"LLM provider validation failed for {settings.llm.provider}: {message}")
     return SetupSummary(
@@ -68,6 +70,7 @@ def prepare_workspace(project_root: Path | None = None) -> SetupSummary:
         created_runtime_dirs=created_runtime_dirs,
         provider_validated=True,
         provider_warning=None,
+        llm_provider=settings.llm.provider,
     )
 
 
@@ -84,7 +87,7 @@ def main() -> int:
     for path in summary.created_runtime_dirs:
         print(f"Created runtime directory: {path}")
     if summary.provider_validated:
-        print("Validated LLM provider prerequisites.")
+        print(f"Validated LLM provider prerequisites: {summary.llm_provider}")
     elif summary.provider_warning:
         print(summary.provider_warning, file=sys.stderr)
 

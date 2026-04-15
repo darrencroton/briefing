@@ -14,6 +14,8 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 - Use `uv` for environment and command execution.
 - Keep the main application in `src/briefing/`.
 - Keep shell usage small and purposeful: `launchd` helpers, external CLI calls, and setup scripts are fine; core orchestration belongs in Python.
+- Supported LLM CLIs are `claude`, `codex`, `copilot`, and `gemini`.
+- CLI providers must be validated for non-interactive automation use; Gemini support is only for API-key or Vertex-style automation credentials, not interactive Google OAuth.
 
 ## Product Constraints
 

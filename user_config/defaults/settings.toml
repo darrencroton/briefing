@@ -27,10 +27,11 @@ source_timeout_seconds = 120
 meeting_notes_placeholder = "- "
 
 [llm]
-provider = "claude_cli"
-command = "claude"
-model = "sonnet"
-effort = ""
+provider = "copilot"
+# Optional executable override. Leave blank to use the provider default.
+command = ""
+model = "claude-sonnet-4.6"
+effort = "high"
 timeout_seconds = 600
 retry_attempts = 3
 temperature = 0.2

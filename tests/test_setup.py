@@ -42,7 +42,7 @@ source_timeout_seconds = 120
 meeting_notes_placeholder = "- "
 
 [llm]
-provider = "claude_cli"
+provider = "claude"
 command = "claude"
 model = "sonnet"
 effort = ""
@@ -164,6 +164,49 @@ def test_prepare_workspace_warns_when_bootstrapped_provider_validation_fails(
     assert summary.provider_validated is False
     assert summary.provider_warning is not None
     assert "provider unavailable" in summary.provider_warning
+    assert summary.llm_provider == "claude"
+
+
+def test_prepare_workspace_fails_for_existing_local_provider_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user_config_dir = tmp_path / "user_config"
+    defaults_dir = user_config_dir / "defaults"
+    defaults_dir.mkdir(parents=True, exist_ok=True)
+    (defaults_dir / "settings.toml").write_text(SETTINGS_TOML, encoding="utf-8")
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    (user_config_dir / "settings.toml").write_text(SETTINGS_TOML, encoding="utf-8")
+
+    monkeypatch.setattr(
+        "briefing.setup.get_provider",
+        lambda settings: SimpleNamespace(validate=lambda: (False, "provider unavailable")),
+    )
+
+    with pytest.raises(ValueError, match="LLM provider validation failed for claude: provider unavailable"):
+        prepare_workspace(tmp_path)
+
+
+def test_setup_main_prints_provider_name_on_success(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        "briefing.setup.prepare_workspace",
+        lambda: SimpleNamespace(
+            created_user_files=(),
+            created_runtime_dirs=(),
+            provider_validated=True,
+            provider_warning=None,
+            llm_provider="copilot",
+        ),
+    )
+
+    from briefing import setup as setup_module
+
+    exit_code = setup_module.main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Validated LLM provider prerequisites: copilot" in captured.out
 
 
 def test_load_series_configs_reads_dm_conversation_ids_block_list(app_settings) -> None:

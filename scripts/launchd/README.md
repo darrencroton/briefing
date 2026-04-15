@@ -16,6 +16,8 @@ uv run briefing validate
 uv run briefing run
 ```
 
+The selected LLM CLI must already be authenticated for non-interactive use before you install the LaunchAgent.
+
 ## Render the plist
 
 ```bash
