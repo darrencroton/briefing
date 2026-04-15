@@ -14,7 +14,7 @@ Use them after the main install is already working:
 ## Choose The Right Guide
 
 - [`slack-source-setup.md`](slack-source-setup.md)
-  Add Slack channels or direct messages to a meeting series.
+  Add Slack channels or DM conversations to a meeting series.
 - [`notion-source-setup.md`](notion-source-setup.md)
   Add one or more standing Notion pages to a meeting series.
 - [`file-source-setup.md`](file-source-setup.md)
@@ -29,7 +29,7 @@ Use the smallest set of sources that gives you reliable meeting context.
 - `previous_note`
   Best default source once a series has already run at least once.
 - `slack`
-  Best when meeting context mostly lives in active channels or one-to-one DMs.
+  Best when meeting context mostly lives in active channels or DM conversations.
 - `notion`
   Best when a recurring meeting revolves around one or two standing pages.
 - `file`

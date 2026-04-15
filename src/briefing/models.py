@@ -51,7 +51,7 @@ class SlackSourceConfig:
     """Slack series configuration."""
 
     channel_refs: list[str] = field(default_factory=list)
-    dm_user_ids: list[str] = field(default_factory=list)
+    dm_conversation_ids: list[str] = field(default_factory=list)
     required: bool = False
     history_days: int | None = None
     max_characters: int | None = None
@@ -143,4 +143,3 @@ class ValidationMessage:
     level: str
     code: str
     message: str
-

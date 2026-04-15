@@ -108,7 +108,7 @@ def _init_series(settings, event_uid: str | None, index: int | None, force: bool
             "calendar_names_any": [event.calendar_name] if event.calendar_name else [],
         },
         "sources": {
-            "slack": {"channel_refs": [], "dm_user_ids": [], "required": False},
+            "slack": {"channel_refs": [], "dm_conversation_ids": [], "required": False},
             "notion": [],
             "files": [],
         },

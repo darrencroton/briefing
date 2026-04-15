@@ -5,9 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from briefing.main import _init_series
+from briefing.models import MeetingEvent
 from briefing.bootstrap import ensure_local_user_config
 from briefing.main import cli
-from briefing.settings import SettingsError, load_settings
+from briefing.settings import SettingsError, load_series_configs, load_settings
 from briefing.setup import ensure_runtime_directories, prepare_workspace
 
 
@@ -162,3 +164,90 @@ def test_prepare_workspace_warns_when_bootstrapped_provider_validation_fails(
     assert summary.provider_validated is False
     assert summary.provider_warning is not None
     assert "provider unavailable" in summary.provider_warning
+
+
+def test_load_series_configs_reads_dm_conversation_ids_block_list(app_settings) -> None:
+    series_path = app_settings.paths.series_dir / "slack-series.yaml"
+    series_path.write_text(
+        """
+series_id: slack-series
+display_name: Slack Series
+note_slug: slack-series
+match:
+  title_any:
+    - Slack Series
+sources:
+  slack:
+    channel_refs:
+      - eng-leads
+    dm_conversation_ids:
+      - D123
+      - G456
+    required: false
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    configs = load_series_configs(app_settings)
+
+    assert configs[0].sources.slack is not None
+    assert configs[0].sources.slack.dm_conversation_ids == ["D123", "G456"]
+
+
+def test_load_series_configs_reads_dm_conversation_ids_inline_list(app_settings) -> None:
+    series_path = app_settings.paths.series_dir / "slack-series.yaml"
+    series_path.write_text(
+        """
+series_id: slack-series
+display_name: Slack Series
+note_slug: slack-series
+match:
+  title_any: [Slack Series]
+sources:
+  slack:
+    channel_refs: [eng-leads]
+    dm_conversation_ids: [D123, G456]
+    required: false
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    configs = load_series_configs(app_settings)
+
+    assert configs[0].sources.slack is not None
+    assert configs[0].sources.slack.dm_conversation_ids == ["D123", "G456"]
+
+
+def test_init_series_scaffolds_dm_conversation_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults_dir = tmp_path / "user_config" / "defaults"
+    defaults_dir.mkdir(parents=True, exist_ok=True)
+    (defaults_dir / "settings.toml").write_text(SETTINGS_TOML, encoding="utf-8")
+    ensure_local_user_config(tmp_path)
+    settings = load_settings(tmp_path)
+
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=SimpleNamespace(isoformat=lambda: "2026-04-13T10:00:00+10:00"),
+        end=None,
+        calendar_name="Work",
+        organizer_email="barry@example.edu",
+        attendees=[{"email": "darren@example.edu"}],
+    )
+
+    class FakeIcalPalClient:
+        def __init__(self, _settings):
+            pass
+
+        def fetch_events(self, _start, _end):
+            return [event]
+
+    monkeypatch.setattr("briefing.main.IcalPalClient", FakeIcalPalClient)
+
+    exit_code = _init_series(settings, event_uid=None, index=None, force=False)
+
+    assert exit_code == 0
+    series_text = (settings.paths.series_dir / "cas-strategy-meeting.yaml").read_text(encoding="utf-8")
+    assert "dm_conversation_ids: []" in series_text

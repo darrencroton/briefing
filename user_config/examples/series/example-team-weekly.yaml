@@ -11,8 +11,8 @@ sources:
   slack:
     channel_refs:
       - direct-reports
-    dm_user_ids:
-      - U0123ABC456
+    dm_conversation_ids:
+      - D0123ABC456
   notion:
     - label: Barry weekly notes
       page_id: abc123def456

@@ -144,7 +144,7 @@ All populated match groups must match for the series to be selected.
 Implemented in v1:
 
 - `previous_note`: latest earlier note in the same series
-- `slack`: configured channels and direct messages via Slack user token
+- `slack`: configured channels and DM conversations via Slack user token
 - `notion`: page/block extraction through the Notion API
 - `file`: local or synced files addressed by path
 

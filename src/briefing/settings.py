@@ -253,7 +253,7 @@ def _parse_slack_source(raw: Any) -> SlackSourceConfig | None:
         return None
     return SlackSourceConfig(
         channel_refs=[str(item) for item in raw.get("channel_refs", [])],
-        dm_user_ids=[str(item) for item in raw.get("dm_user_ids", [])],
+        dm_conversation_ids=[str(item) for item in raw.get("dm_conversation_ids", [])],
         required=bool(raw.get("required", False)),
         history_days=_optional_int(raw.get("history_days")),
         max_characters=_optional_int(raw.get("max_characters")),

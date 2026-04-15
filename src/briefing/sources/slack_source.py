@@ -41,21 +41,27 @@ class SlackClient:
         messages = self._fetch_messages(channel_id, oldest)
         return f"Slack channel {channel_name}", self._format_digest(f"channel {channel_name}", messages, oldest)
 
-    def fetch_dm_digest(self, user_id: str, oldest: datetime) -> tuple[str, str]:
-        """Fetch a DM conversation with a user."""
-        response = self._call("conversations.open", {"users": user_id})
-        channel = response["channel"]
-        channel_id = str(channel["id"])
-        user_name = self.resolve_user(user_id)
-        messages = self._fetch_messages(channel_id, oldest)
-        return f"Slack DMs with {user_name}", self._format_digest(f"DM {user_name}", messages, oldest)
+    def fetch_dm_conversation_digest(self, conversation_id: str, oldest: datetime) -> tuple[str, str]:
+        """Fetch a direct-message or group-direct-message conversation by ID."""
+        conversation = self._get_conversation_info(conversation_id)
+        label, digest_label = self._build_dm_labels(conversation_id, conversation)
+        messages = self._fetch_messages(str(conversation["id"]), oldest)
+        return label, self._format_digest(digest_label, messages, oldest)
 
     def _resolve_channel(self, channel_ref: str) -> dict:
         if channel_ref in self.channel_cache:
-            return self.channel_cache[channel_ref]
+            channel = self.channel_cache[channel_ref]
+            if channel.get("is_im") or channel.get("is_mpim"):
+                raise RuntimeError(
+                    f"Slack conversation {channel_ref} is a direct-message conversation; move it to dm_conversation_ids"
+                )
+            return channel
         if re.fullmatch(r"[CGD][A-Z0-9]+", channel_ref):
-            info = self._call("conversations.info", {"channel": channel_ref})
-            channel = info["channel"]
+            channel = self._get_conversation_info(channel_ref)
+            if channel.get("is_im") or channel.get("is_mpim"):
+                raise RuntimeError(
+                    f"Slack conversation {channel_ref} is a direct-message conversation; move it to dm_conversation_ids"
+                )
             self.channel_cache[channel_ref] = channel
             return channel
 
@@ -77,6 +83,15 @@ class SlackClient:
             if not cursor:
                 break
         raise RuntimeError(f"Slack channel not found: {channel_ref}")
+
+    def _get_conversation_info(self, conversation_id: str) -> dict:
+        """Return conversation metadata by ID with a small cache."""
+        if conversation_id in self.channel_cache:
+            return self.channel_cache[conversation_id]
+        response = self._call("conversations.info", {"channel": conversation_id})
+        conversation = response["channel"]
+        self.channel_cache[conversation_id] = conversation
+        return conversation
 
     def _fetch_messages(self, channel_id: str, oldest: datetime) -> list[dict]:
         messages: list[dict] = []
@@ -125,6 +140,43 @@ class SlackClient:
         name = profile.get("display_name") or profile.get("real_name") or user_id
         self.user_cache[user_id] = str(name)
         return self.user_cache[user_id]
+
+    def _resolve_user_for_label(self, user_id: str) -> str | None:
+        """Resolve a user name for labels without failing the whole source."""
+        try:
+            return self.resolve_user(user_id)
+        except (requests.RequestException, RuntimeError):
+            return None
+
+    def _build_dm_labels(self, conversation_id: str, conversation: dict) -> tuple[str, str]:
+        """Build a stable label for one-to-one and multi-person DM conversations."""
+        if conversation.get("is_im"):
+            user_id = str(conversation.get("user", "")).strip()
+            user_name = self._resolve_user_for_label(user_id) if user_id else None
+            if user_name:
+                return f"Slack DM with {user_name}", f"DM {user_name}"
+            return f"Slack DM {conversation_id}", f"DM {conversation_id}"
+
+        if conversation.get("is_mpim"):
+            member_ids = self._call("conversations.members", {"channel": conversation_id}).get("members", [])
+            names: list[str] = []
+            for member_id in member_ids:
+                if not isinstance(member_id, str):
+                    continue
+                user_name = self._resolve_user_for_label(member_id)
+                if user_name is None:
+                    return f"Slack group DM {conversation_id}", f"group DM {conversation_id}"
+                names.append(user_name)
+            if names:
+                participants = ", ".join(names)
+                return f"Slack group DM with {participants}", f"group DM {participants}"
+            return f"Slack group DM {conversation_id}", f"group DM {conversation_id}"
+
+        if conversation.get("is_channel") or conversation.get("is_private"):
+            raise RuntimeError(
+                f"Slack conversation {conversation_id} is not a direct-message conversation; move it to channel_refs"
+            )
+        raise RuntimeError(f"Unsupported Slack conversation type for {conversation_id}")
 
     def _call(self, method: str, payload: dict[str, str] | None = None) -> dict:
         attempts = 0
@@ -246,9 +298,9 @@ def collect_slack_sources(
                 )
             )
 
-    for user_id in config.dm_user_ids:
+    for conversation_id in config.dm_conversation_ids:
         try:
-            label, content = client.fetch_dm_digest(user_id, oldest)
+            label, content = client.fetch_dm_conversation_digest(conversation_id, oldest)
             limited, truncated = shorten_text(content, max_characters)
             results.append(
                 SourceResult(
@@ -258,19 +310,19 @@ def collect_slack_sources(
                     required=config.required,
                     status="ok",
                     truncated=truncated,
-                    metadata={"dm_user_id": user_id},
+                    metadata={"dm_conversation_id": conversation_id},
                 )
             )
         except (requests.RequestException, RuntimeError) as exc:
             results.append(
                 SourceResult(
                     source_type="slack",
-                    label=f"Slack DMs with {user_id}",
+                    label=f"Slack DM {conversation_id}",
                     content="",
                     required=config.required,
                     status="error",
                     error=str(exc),
-                    metadata={"dm_user_id": user_id},
+                    metadata={"dm_conversation_id": conversation_id},
                 )
             )
 

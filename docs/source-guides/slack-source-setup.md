@@ -6,7 +6,7 @@ Use Slack when relevant meeting context lives in:
 
 - a team or project channel
 - a private channel
-- a one-to-one DM with a recurring participant
+- a one-to-one or multi-person DM conversation
 
 `briefing` reads recent message history and turns it into a digest for the LLM. It does not post back to Slack.
 
@@ -14,12 +14,12 @@ Use Slack when relevant meeting context lives in:
 
 If you want the short version first, do these in order:
 
-1. [Choose the exact channels or one-to-one DMs you want `briefing` to read](#1-decide-which-slack-conversations-matter).
+1. [Choose the exact channels or DM conversations you want `briefing` to read](#1-decide-which-slack-conversations-matter).
 2. [Open Slack's app management site at `https://api.slack.com/apps` and create a new app from scratch for the correct workspace](#2-create-a-slack-app-in-the-correct-workspace).
 3. [In `OAuth & Permissions`, add the required entries under `User Token Scopes`](#3-add-the-correct-user-token-scopes).
 4. [Install the app to the workspace and copy the installed `User OAuth Token`](#4-install-the-app-and-copy-the-user-oauth-token).
 5. [Put that token in `~/.env.briefing` as `SLACK_USER_TOKEN=...`](#5-save-the-token-in-envbriefing).
-6. [Add `channel_refs` and/or `dm_user_ids` to the right series YAML file](#7-update-the-series-yaml).
+6. [Add `channel_refs` and/or `dm_conversation_ids` to the right series YAML file](#7-update-the-series-yaml).
 7. [Run `uv run briefing validate`](#8-validate).
 8. [Run a real `uv run briefing run`](#9-test-with-a-real-run).
 
@@ -47,7 +47,7 @@ SLACK_USER_TOKEN=your_slack_user_token_here
 2. Conversation identifiers in the series YAML:
 
 - channel references under `sources.slack.channel_refs`
-- Slack user IDs under `sources.slack.dm_user_ids`
+- DM conversation IDs under `sources.slack.dm_conversation_ids`
 
 Important distinctions:
 
@@ -72,7 +72,7 @@ Good candidates:
 
 - one stable team channel for a weekly team meeting
 - one project channel for a steering or delivery meeting
-- one DM for a recurring one-on-one
+- one DM conversation for a recurring one-on-one or small standing group
 
 Avoid starting with too many channels. A smaller, higher-signal set usually produces better briefings and is easier to debug.
 
@@ -108,17 +108,18 @@ Use these scopes:
 
 - Public channels: `channels:read`, `channels:history`
 - Private channels: `groups:read`, `groups:history`
-- One-to-one DMs: `im:history`, `im:write`
+- One-to-one DMs by conversation ID: `im:read`, `im:history`
+- Multi-person DMs by conversation ID: `mpim:read`, `mpim:history`
 - Human-readable participant names in digests: `users:read`
 
 Why `briefing` needs them:
 
 - it resolves channel names or IDs
-- it opens a DM from a Slack user ID
+- it resolves DM conversation IDs and types
 - it reads conversation history
 - it resolves readable Slack member names for the digest
 
-If you only need channels, you can skip the DM scopes. If you only need DMs, you can skip the channel scopes.
+If you only need channels, you can skip the DM scopes. If you only need one-to-one DMs, you can skip the `mpim:*` scopes. If you only need group DMs, you can skip the `im:*` scopes.
 
 If you add or change scopes after installing the app, return to `OAuth & Permissions` and run `Install to Workspace` again so Slack issues an updated installed token.
 
@@ -198,27 +199,32 @@ Examples:
 
 ### Direct Messages
 
-For DMs, `briefing` needs the other person's Slack user ID.
+For DMs, `briefing` needs the DM conversation ID.
 
-Use the person's Slack member ID, not:
+Use the conversation ID, not:
 
-- the person's display name
+- the other person's member ID
+- the other person's display name
 - their `@handle`
-- the DM conversation ID
 
-How to get the user ID:
+This now works for both:
 
-1. Open the person's profile in Slack.
-2. Use the profile actions menu and look for `Copy member ID` or an equivalent user-ID action.
-3. Copy the `U...` identifier.
+- a one-to-one DM conversation
+- a multi-person DM conversation
 
-Example:
+How to get the conversation ID:
 
-- Slack user ID: `U0123ABC456`
+1. Open the DM conversation in Slack.
+2. Open or copy the conversation link in the Slack web UI.
+3. Look at the URL. Slack DM conversation URLs include `/archives/CONVERSATION_ID`.
+4. Copy the final `D...` or `G...` identifier.
 
-`briefing` uses that user ID to open the one-to-one DM each time it runs.
+Examples:
 
-Slack's help center has the terminology here: [Find your Slack workspace or member ID](https://slack.com/help/articles/360035692513).
+- one-to-one DM conversation ID: `D0123ABC456`
+- multi-person DM conversation ID: `G0123ABC456`
+
+`briefing` reads the conversation directly from that ID instead of opening it from a member ID.
 
 ## 7. Update The Series YAML
 
@@ -231,8 +237,8 @@ sources:
   slack:
     channel_refs:
       - eng-leads
-    dm_user_ids:
-      - U0123ABC456
+    dm_conversation_ids:
+      - D0123ABC456
 ```
 
 Example with a private channel by ID:
@@ -252,8 +258,9 @@ sources:
     channel_refs:
       - general
       - jayde-phd
-    dm_user_ids:
-      - U0ADBSRXXXX
+    dm_conversation_ids:
+      - D0123ABC456
+      - G0123ABC789
     required: false
 ```
 
@@ -263,7 +270,7 @@ Inline YAML lists also work if you prefer that style:
 sources:
   slack:
     channel_refs: [general, jayde-phd]
-    dm_user_ids: [U0ADBSRXXXX]
+    dm_conversation_ids: [D0123ABC456, G0123ABC789]
     required: false
 ```
 
@@ -318,7 +325,7 @@ For Slack, this confirms:
 It does not confirm:
 
 - that every channel reference is correct
-- that every DM user ID is correct
+- that every DM conversation ID is correct
 - that the token has access to the specific private channels you chose
 - that you copied a user token with all required scopes for every configured conversation type
 
@@ -377,9 +384,10 @@ Usually one of:
 
 Usually one of:
 
-- you used a display name or DM conversation ID instead of the other person's `U...` user ID
-- the token is missing `im:history` or `im:write`
-- the user token cannot access that DM in the current workspace
+- you used a member ID or display name instead of the DM conversation ID
+- the token is missing the required `im:*` or `mpim:*` scopes
+- the conversation ID points to a public/private channel instead of a DM conversation
+- the user token cannot access that DM conversation in the current workspace
 
 ### The run succeeds but the Slack content is noisy
 
@@ -389,7 +397,7 @@ Reduce `history_days`, remove low-signal channels, or lower `max_characters` for
 
 The current Slack source is intentionally narrow:
 
-- it reads recent history from configured channels and one-to-one DMs
+- it reads recent history from configured channels and DM conversations
 - it includes thread replies under matched parent messages
 - it does not search all of Slack
 - it does not infer channels automatically from meeting names

@@ -451,7 +451,7 @@ Good first principle:
 Fields:
 
 - `channel_refs`
-- `dm_user_ids`
+- `dm_conversation_ids`
 - `required`
 - `history_days`
 - `max_characters`
@@ -462,11 +462,11 @@ Example:
 slack:
   channel_refs:
     - eng-leads
-  dm_user_ids:
-    - U0123ABC456
+  dm_conversation_ids:
+    - D0123ABC456
 ```
 
-Use this when pre-meeting context often lives in a channel or DM thread.
+Use this when pre-meeting context often lives in a channel or DM conversation. DM conversation IDs support both one-to-one and multi-person DMs.
 
 For the step-by-step setup flow, including tokens, scopes, and how to choose identifiers, see [`source-guides/slack-source-setup.md`](source-guides/slack-source-setup.md).
 

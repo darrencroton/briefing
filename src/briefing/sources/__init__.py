@@ -32,7 +32,9 @@ def collect_sources(
     jobs: list[tuple[int, callable]] = [(0, lambda: [collect_previous_note(context)])]
     order = 1
 
-    if series.sources.slack and (series.sources.slack.channel_refs or series.sources.slack.dm_user_ids):
+    if series.sources.slack and (
+        series.sources.slack.channel_refs or series.sources.slack.dm_conversation_ids
+    ):
         token = env.get("SLACK_USER_TOKEN", "")
         jobs.append(
             (
@@ -84,4 +86,3 @@ def collect_sources(
     for _, results in sorted(results_by_order, key=lambda item: item[0]):
         flattened.extend(results)
     return flattened
-
