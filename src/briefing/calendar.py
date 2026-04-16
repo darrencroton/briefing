@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta
 
 from .models import MeetingEvent
 from .settings import AppSettings
+
+# Stable public constant from EventKit — safe to inline since the value
+# is part of Apple's C enum and has never changed.  Avoids importing the
+# framework at module level (which fails on non-macOS).
+_EK_ENTITY_TYPE_EVENT = 0  # EventKit.EKEntityTypeEvent
 
 
 class CalendarError(RuntimeError):
@@ -79,6 +85,9 @@ def _ns_date(dt: datetime):
 
 def _ekevent_to_meeting(event) -> MeetingEvent | None:
     """Map an EKEvent to a MeetingEvent."""
+    # eventIdentifier() is Apple's recommended persistent identifier for
+    # events.  calendarItemExternalIdentifier (the iCalendar UID) can be
+    # nil for some providers and is not guaranteed unique across stores.
     uid = event.eventIdentifier()
     title = event.title() or ""
     if not uid or not title:
@@ -155,19 +164,20 @@ class EventKitClient:
 
     def _get_calendars(self, store):
         """Resolve the calendar objects to query based on include/exclude settings."""
-        # EKEntityTypeEvent is the stable integer constant 0.
-        all_calendars = store.calendarsForEntityType_(0)
+        all_calendars = store.calendarsForEntityType_(_EK_ENTITY_TYPE_EVENT)
         include = {name.lower() for name in self.settings.calendar.include_calendar_names}
         exclude = {name.lower() for name in self.settings.calendar.exclude_calendar_names}
 
+        if not include and not exclude:
+            # None means "all calendars" in the EventKit predicate.
+            return None
+
+        calendars = list(all_calendars)
         if include:
-            # Return only the matching calendars — an empty list is
-            # intentional when none match (produces zero events).
-            return [c for c in all_calendars if (c.title() or "").lower() in include]
+            calendars = [c for c in calendars if (c.title() or "").lower() in include]
         if exclude:
-            return [c for c in all_calendars if (c.title() or "").lower() not in exclude]
-        # None means "all calendars" in the EventKit predicate.
-        return None
+            calendars = [c for c in calendars if (c.title() or "").lower() not in exclude]
+        return calendars
 
     def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
         """Fetch events in a specific window."""
@@ -207,9 +217,11 @@ class EventKitClient:
         except CalendarError as exc:
             return False, str(exc)
         except ImportError:
+            if sys.platform != "darwin":
+                return False, "EventKit requires macOS"
             return False, (
                 "pyobjc-framework-EventKit is not installed. "
-                "Run: uv add pyobjc-framework-EventKit"
+                "Run: uv sync"
             )
         except Exception as exc:
             return False, f"EventKit access check failed: {exc}"

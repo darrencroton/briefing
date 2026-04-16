@@ -184,3 +184,99 @@ def test_eventkit_client_fetch_events_includes_all_day_when_configured(app_setti
         )
 
     assert len(events) == 2
+
+
+def _make_fake_calendar(title: str):
+    return SimpleNamespace(title=lambda: title)
+
+
+def _make_store_with_calendars(calendar_titles: list[str], events):
+    """Build a fake store whose calendarsForEntityType_ returns named calendars."""
+    calendars = [_make_fake_calendar(t) for t in calendar_titles]
+    return SimpleNamespace(
+        predicateForEventsWithStartDate_endDate_calendars_=lambda s, e, c: "predicate",
+        eventsMatchingPredicate_=lambda p: events,
+        calendarsForEntityType_=lambda t: calendars,
+    )
+
+
+def test_get_calendars_include_filter(app_settings) -> None:
+    app_settings.calendar.include_calendar_names = ["Work"]
+    event = _make_ek_event(uid="e1", calendar_title="Work")
+    fake_store = _make_store_with_calendars(["Work", "Personal", "Holidays"], [event])
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        events = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+
+    assert len(events) == 1
+    assert events[0].uid == "e1"
+
+
+def test_get_calendars_include_is_case_insensitive(app_settings) -> None:
+    app_settings.calendar.include_calendar_names = ["work"]
+    event = _make_ek_event(uid="e1", calendar_title="Work")
+    fake_store = _make_store_with_calendars(["Work"], [event])
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        events = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+
+    assert len(events) == 1
+
+
+def test_get_calendars_exclude_filter(app_settings) -> None:
+    app_settings.calendar.exclude_calendar_names = ["Holidays"]
+    event = _make_ek_event(uid="e1", calendar_title="Work")
+    fake_store = _make_store_with_calendars(["Work", "Holidays"], [event])
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        events = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+
+    assert len(events) == 1
+
+
+def test_get_calendars_include_and_exclude_combined(app_settings) -> None:
+    app_settings.calendar.include_calendar_names = ["Work", "Work-Archive"]
+    app_settings.calendar.exclude_calendar_names = ["Work-Archive"]
+    event = _make_ek_event(uid="e1", calendar_title="Work")
+    fake_store = _make_store_with_calendars(["Work", "Work-Archive", "Personal"], [event])
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        # _get_calendars should include "Work" and "Work-Archive" then exclude "Work-Archive"
+        calendars = client._get_calendars(fake_store)
+
+    assert len(calendars) == 1
+    assert calendars[0].title() == "Work"
+
+
+def test_get_calendars_include_matching_nothing_returns_empty(app_settings) -> None:
+    app_settings.calendar.include_calendar_names = ["NonExistent"]
+    fake_store = _make_store_with_calendars(["Work", "Personal"], [])
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        calendars = client._get_calendars(fake_store)
+
+    assert calendars == []
