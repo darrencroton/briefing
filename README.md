@@ -1,28 +1,28 @@
 # Briefing
 
-`briefing` is a local-first macOS tool that prepares Markdown meeting briefings from Apple Calendar and a small set of explicitly configured context sources. It is designed for dependable unattended use: configured meetings only, deterministic note paths, managed refreshes, clear validation, and no silent fallback behavior.
+You have a recurring meeting in ten minutes. Over the past week you've traded Slack messages with the person, there are open items from last time, and a couple of Notion pages have been updated. You could spend the next ten minutes skimming all of that — or you could open your meeting note and find a short, focused summary already waiting for you.
 
-The default target is Obsidian, but the output is plain Markdown and the notes directory can point at any local or synced Markdown workspace.
+`briefing` does that. It reads your Apple Calendar, and for each meeting series you configure, it pulls recent context from the sources you actually use — Slack channels and DMs, Notion pages, local files, and the previous meeting note — sends it to an LLM, and writes a concise pre-meeting briefing into a Markdown note. The note lands in Obsidian (or any Markdown workspace you point it at), ready to glance at before you walk in.
 
-## What It Does
+You choose which meetings get briefings and which sources feed each one. A short YAML file per meeting series is all it takes. Everything runs locally on your Mac, on a schedule or on demand.
 
-On each run, `briefing`:
+### What a briefing looks like
 
-1. reads upcoming events from Apple Calendar through EventKit
-2. matches events against explicit YAML meeting-series rules in `user_config/series/`
-3. collects context from the configured sources for that series
-4. sends a prompt to the configured LLM CLI
-5. writes or refreshes the managed `Briefing` block in the meeting note
-6. records occurrence state and run diagnostics locally
+Each meeting note gets a `## Briefing` section with a handful of bullets — typically 3 to 6 — that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. No filler, no channel-wide noise, no generic summaries.
 
-Core behavior:
+The rest of the note is yours. `briefing` only manages the briefing block; your own `Meeting Notes` and anything else you add are never touched.
 
-- Only explicitly configured meeting series are processed.
-- Series matching uses explicit rules, not title-only heuristics.
-- Occurrence identity stays stable across event title changes.
-- Only the managed pre-meeting summary block is refreshed.
-- User-entered `Meeting Notes` or `Actions` are never overwritten.
-- Required source failures block note generation for that meeting.
+### How it works
+
+When `briefing` runs (manually or via `launchd`), it:
+
+1. reads upcoming events from Apple Calendar
+2. matches them against your configured meeting series
+3. collects context from each series' configured sources
+4. sends the context to an LLM CLI (`claude`, `codex`, `copilot`, or `gemini`)
+5. writes or refreshes the briefing block in the meeting note
+
+Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
 
 ## Current Capabilities
 
