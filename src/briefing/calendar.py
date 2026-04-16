@@ -56,17 +56,17 @@ def _request_access(store) -> None:
             EventKit.EKEntityTypeEvent, _callback
         )
 
-    # The callback fires on the main thread before control returns when
-    # running outside of a runloop (i.e. from a CLI tool).  If it hasn't
-    # fired yet, pump the runloop briefly.
+    # The callback may require the main runloop to continue processing while
+    # the user responds to the system permission prompt.  Wait until the
+    # completion callback reports the result.
     if not done:
         from Foundation import NSRunLoop, NSDate
 
-        deadline = NSDate.dateWithTimeIntervalSinceNow_(5.0)
-        while not done and NSRunLoop.currentRunLoop().runMode_beforeDate_(
-            "kCFRunLoopDefaultMode", deadline
-        ):
-            pass
+        while not done:
+            NSRunLoop.currentRunLoop().runMode_beforeDate_(
+                "kCFRunLoopDefaultMode",
+                NSDate.dateWithTimeIntervalSinceNow_(0.1),
+            )
 
     if not granted:
         detail = str(error_ref) if error_ref else "denied or restricted"
