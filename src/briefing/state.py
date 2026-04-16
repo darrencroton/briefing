@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import MeetingEvent, OccurrenceState
@@ -22,8 +22,13 @@ class StateStore:
         self.runs_dir = ensure_directory(self.state_dir / "runs")
 
     def occurrence_key(self, event: MeetingEvent) -> str:
-        """Create a stable occurrence key."""
-        return sha256_text(f"{event.uid}|{event.start.isoformat()}")[:24]
+        """Create a stable occurrence key.
+
+        Normalizes start to UTC so the key is independent of the local
+        timezone (e.g. travel, DST boundary differences).
+        """
+        utc_start = event.start.astimezone(timezone.utc).isoformat()
+        return sha256_text(f"{event.uid}|{utc_start}")[:24]
 
     def load_occurrence(self, occurrence_key: str) -> OccurrenceState | None:
         """Load stored occurrence state."""

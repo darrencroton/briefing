@@ -60,7 +60,6 @@ def app_settings(tmp_path: Path) -> AppSettings:
             window_max_minutes=45,
             include_calendar_names=[],
             exclude_calendar_names=[],
-            icalpal_path="icalPal",
             lookback_days_for_init=14,
         ),
         execution=ExecutionSettings(max_parallel_sources=4, source_timeout_seconds=5),

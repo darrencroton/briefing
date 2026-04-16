@@ -8,7 +8,7 @@ from briefing.validation import validate_environment
 
 def test_validate_environment_reports_provider_failure(monkeypatch, app_settings) -> None:
     monkeypatch.setattr(
-        "briefing.validation.IcalPalClient",
+        "briefing.validation.EventKitClient",
         lambda settings: SimpleNamespace(validate_access=lambda: (True, "ical ok")),
     )
     monkeypatch.setattr(
@@ -23,7 +23,7 @@ def test_validate_environment_reports_provider_failure(monkeypatch, app_settings
 
 def test_validate_environment_reports_provider_success(monkeypatch, app_settings) -> None:
     monkeypatch.setattr(
-        "briefing.validation.IcalPalClient",
+        "briefing.validation.EventKitClient",
         lambda settings: SimpleNamespace(validate_access=lambda: (True, "ical ok")),
     )
     monkeypatch.setattr(

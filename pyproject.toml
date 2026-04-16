@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "PyYAML>=6.0.2,<7",
+  "pyobjc-framework-EventKit>=11.0; sys_platform == 'darwin'",
   "requests>=2.32.3,<3",
 ]
 

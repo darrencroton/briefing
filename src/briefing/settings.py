@@ -47,7 +47,6 @@ class CalendarSettings:
     window_max_minutes: int
     include_calendar_names: list[str]
     exclude_calendar_names: list[str]
-    icalpal_path: str
     lookback_days_for_init: int
 
 

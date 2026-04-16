@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import yaml
 
-from .calendar import IcalPalClient
+from .calendar import EventKitClient
 from .logging_utils import configure_logging
 from .settings import SettingsError, load_series_configs, load_settings
 from .runner import run_briefing
@@ -62,7 +62,7 @@ def _validate(settings) -> int:
 
 
 def _init_series(settings, event_uid: str | None, index: int | None, force: bool) -> int:
-    client = IcalPalClient(settings)
+    client = EventKitClient(settings)
     now = datetime.now().astimezone()
     end = now + timedelta(days=settings.calendar.lookback_days_for_init)
     events = client.fetch_events(now, end)
