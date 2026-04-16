@@ -38,6 +38,7 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
         "series_id": "cas-strategy",
         "start": "2026-04-13T10:00:00+10:00",
     }
+    assert "[[2026-04-13]] | [[CAS Strategy Meeting Meetings]]" in note
     assert "## Briefing\n\n- First summary bullet" in note
     assert "## Meeting Notes\n\n- " in note
 
@@ -95,11 +96,11 @@ def test_find_previous_note_uses_series_id_and_start(app_settings, series_config
     first = app_settings.paths.meeting_notes_dir / "2026-04-01-1000-cas-strategy.md"
     second = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-cas-strategy.md"
     first.write_text(
-        "---\nseries_id: cas-strategy\nstart: 2026-04-01T10:00:00+10:00\n---\n\n# First 10am–11am\n[[2026-04-01]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- One\n\n---\n## Meeting Notes\n\n- \n",
+        "---\nseries_id: cas-strategy\nstart: 2026-04-01T10:00:00+10:00\n---\n\n# First 10am–11am\n[[2026-04-01]] | [[CAS Strategy Meeting Meetings]]\n\n---\n## Briefing\n\n- One\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
     second.write_text(
-        "---\nseries_id: cas-strategy\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Second 10am–11am\n[[2026-04-08]] [[CAS Strategy Meeting Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
+        "---\nseries_id: cas-strategy\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Second 10am–11am\n[[2026-04-08]] | [[CAS Strategy Meeting Meetings]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
     event = MeetingEvent(
@@ -118,7 +119,7 @@ def test_find_previous_note_uses_series_id_and_start(app_settings, series_config
 def test_summarize_previous_note_extracts_title_from_compact_time_heading(app_settings) -> None:
     note_path = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-barry.md"
     note_path.write_text(
-        "---\nseries_id: barry\nstart: 2026-04-08T17:15:00+10:00\n---\n\n# Barry 5:15–5:45pm\n[[2026-04-08]] [[Barry Meeting]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
+        "---\nseries_id: barry\nstart: 2026-04-08T17:15:00+10:00\n---\n\n# Barry 5:15–5:45pm\n[[2026-04-08]] | [[Barry Meetings]]\n\n---\n## Briefing\n\n- Two\n\n---\n## Meeting Notes\n\n- \n",
         encoding="utf-8",
     )
 
@@ -131,7 +132,7 @@ def test_summarize_previous_note_extracts_title_from_compact_time_heading(app_se
 def test_summarize_previous_note_keeps_non_empty_meeting_notes(app_settings) -> None:
     note_path = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-followup.md"
     note_path.write_text(
-        "---\nseries_id: followup\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Followup 10am–11am\n[[2026-04-08]] [[Followup Meeting]]\n\n---\n## Briefing\n\n- Review draft\n\n---\n## Meeting Notes\n\n- Send revised figures before Friday\n",
+        "---\nseries_id: followup\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Followup 10am–11am\n[[2026-04-08]] | [[Followup Meetings]]\n\n---\n## Briefing\n\n- Review draft\n\n---\n## Meeting Notes\n\n- Send revised figures before Friday\n",
         encoding="utf-8",
     )
 

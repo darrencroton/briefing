@@ -35,7 +35,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
         encoding="utf-8",
     )
     (template_dir / "meeting_note.md").write_text(
-        "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n",
+        "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] | [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n",
         encoding="utf-8",
     )
     env_file = tmp_path / ".env.briefing"

@@ -1,6 +1,6 @@
 {{FRONTMATTER}}
 # {{HEADING}}
-[[{{DATE_LINK}}]] [[{{SERIES_LINK}}]]
+[[{{DATE_LINK}}]] | [[{{SERIES_LINK}}]]
 
 ---
 {{BRIEFING_BLOCK}}

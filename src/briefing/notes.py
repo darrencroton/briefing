@@ -31,7 +31,7 @@ def render_note(
             "FRONTMATTER": frontmatter,
             "HEADING": heading,
             "DATE_LINK": event.start.date().isoformat(),
-            "SERIES_LINK": f"{series.display_name} Meeting",
+            "SERIES_LINK": f"{series.display_name} Meetings",
             "BRIEFING_BLOCK": briefing_block,
             "MEETING_NOTES_PLACEHOLDER": settings.output.meeting_notes_placeholder,
         },
