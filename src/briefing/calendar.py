@@ -1,57 +1,195 @@
-"""Apple Calendar access through icalPal."""
+"""Apple Calendar access through EventKit."""
 
 from __future__ import annotations
 
-import json
-import subprocess
-from collections.abc import Iterable
+import logging
 from datetime import datetime, timedelta
 
 from .models import MeetingEvent
 from .settings import AppSettings
-from .utils import first_non_empty, parse_datetime, shell_join
+
+logger = logging.getLogger(__name__)
 
 
 class CalendarError(RuntimeError):
-    """Raised when icalPal fails."""
+    """Raised when EventKit access fails."""
 
 
-class IcalPalClient:
-    """Thin icalPal wrapper."""
+def _get_event_store():
+    """Create and return an EKEventStore instance.
+
+    Isolated for testability -- tests can monkeypatch this function to
+    avoid hitting the real EventKit framework.
+    """
+    import EventKit  # pyobjc-framework-EventKit
+
+    return EventKit.EKEventStore.alloc().init()
+
+
+def _request_access(store) -> None:
+    """Request calendar access synchronously.
+
+    On macOS 14+ this uses ``requestFullAccessToEventsWithCompletion_``.
+    On older releases it falls back to
+    ``requestAccessToEntityType_completion_``.
+    """
+    import EventKit
+
+    granted = False
+    error_ref = None
+    done = False
+
+    def _callback(ok, err):
+        nonlocal granted, error_ref, done
+        granted = ok
+        error_ref = err
+        done = True
+
+    # macOS 14 (Sonoma) introduced requestFullAccessToEventsWithCompletion_.
+    if hasattr(store, "requestFullAccessToEventsWithCompletion_"):
+        store.requestFullAccessToEventsWithCompletion_(_callback)
+    else:
+        store.requestAccessToEntityType_completion_(
+            EventKit.EKEntityTypeEvent, _callback
+        )
+
+    # The callback fires on the main thread before control returns when
+    # running outside of a runloop (i.e. from a CLI tool).  If it hasn't
+    # fired yet, pump the runloop briefly.
+    if not done:
+        from Foundation import NSRunLoop, NSDate
+
+        deadline = NSDate.dateWithTimeIntervalSinceNow_(5.0)
+        while not done and NSRunLoop.currentRunLoop().runMode_beforeDate_(
+            "kCFRunLoopDefaultMode", deadline
+        ):
+            pass
+
+    if not granted:
+        detail = str(error_ref) if error_ref else "denied or restricted"
+        raise CalendarError(
+            f"Calendar access not granted: {detail}. "
+            "Open System Settings > Privacy & Security > Calendars and enable access."
+        )
+
+
+def _ns_date(dt: datetime):
+    """Convert a Python datetime to an NSDate."""
+    from Foundation import NSDate
+
+    return NSDate.dateWithTimeIntervalSince1970_(dt.timestamp())
+
+
+def _ekevent_to_meeting(event, calendar_names_lower: set[str] | None = None) -> MeetingEvent | None:
+    """Map an EKEvent to a MeetingEvent."""
+    uid = event.eventIdentifier()
+    title = event.title() or ""
+    if not uid or not title:
+        return None
+
+    start_ns = event.startDate()
+    end_ns = event.endDate()
+    start = datetime.fromtimestamp(start_ns.timeIntervalSince1970()).astimezone() if start_ns else None
+    end = datetime.fromtimestamp(end_ns.timeIntervalSince1970()).astimezone() if end_ns else None
+    if start is None:
+        return None
+
+    calendar_name = None
+    ek_calendar = event.calendar()
+    if ek_calendar:
+        calendar_name = ek_calendar.title()
+
+    organizer_name = None
+    organizer_email = None
+    ek_organizer = event.organizer()
+    if ek_organizer:
+        organizer_name = ek_organizer.name() or None
+        url = ek_organizer.URL()
+        if url:
+            resource = url.resourceSpecifier()
+            if resource and resource.startswith("//"):
+                organizer_email = resource[2:].lower()
+            elif resource:
+                organizer_email = resource.lower()
+
+    attendees: list[dict[str, str]] = []
+    ek_attendees = event.attendees() or []
+    for participant in ek_attendees:
+        name = participant.name() or ""
+        email = ""
+        p_url = participant.URL()
+        if p_url:
+            resource = p_url.resourceSpecifier()
+            if resource and resource.startswith("//"):
+                email = resource[2:].lower()
+            elif resource:
+                email = resource.lower()
+        if name or email:
+            attendees.append({"name": name, "email": email})
+
+    location = event.location() or None
+    notes = event.notes() or None
+    url_value = None
+    ek_url = event.URL()
+    if ek_url:
+        url_value = str(ek_url)
+
+    return MeetingEvent(
+        uid=uid,
+        title=title,
+        start=start,
+        end=end,
+        calendar_name=calendar_name,
+        organizer_name=organizer_name,
+        organizer_email=organizer_email,
+        location=location,
+        notes=notes,
+        url=url_value,
+        attendees=attendees,
+        raw={},
+    )
+
+
+class EventKitClient:
+    """Calendar client using Apple EventKit framework."""
 
     def __init__(self, settings: AppSettings):
         self.settings = settings
 
+    def _get_calendars(self, store):
+        """Resolve the calendar objects to query based on include/exclude settings."""
+        # EKEntityTypeEvent is the stable integer constant 0.
+        all_calendars = store.calendarsForEntityType_(0)
+        include = {name.lower() for name in self.settings.calendar.include_calendar_names}
+        exclude = {name.lower() for name in self.settings.calendar.exclude_calendar_names}
+
+        if include:
+            calendars = [c for c in all_calendars if (c.title() or "").lower() in include]
+        elif exclude:
+            calendars = [c for c in all_calendars if (c.title() or "").lower() not in exclude]
+        else:
+            calendars = list(all_calendars)
+
+        return calendars or None  # None means "all" in the predicate
+
     def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
         """Fetch events in a specific window."""
-        command = [
-            self.settings.calendar.icalpal_path,
-            "-o",
-            "json",
-            "-c",
-            "events",
-            f"--from={start.isoformat()}",
-            f"--to={end.isoformat()}",
-            "--uid",
-            "--aep=all",
-        ]
-        if not self.settings.calendar.include_all_day:
-            command.append("--ea")
-        for calendar_name in self.settings.calendar.include_calendar_names:
-            command.append(f"--ic={calendar_name}")
-        for calendar_name in self.settings.calendar.exclude_calendar_names:
-            command.append(f"--ec={calendar_name}")
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
+        store = _get_event_store()
+        _request_access(store)
+        calendars = self._get_calendars(store)
+        predicate = store.predicateForEventsWithStartDate_endDate_calendars_(
+            _ns_date(start), _ns_date(end), calendars
         )
-        if completed.returncode != 0:
-            message = completed.stderr.strip() or completed.stdout.strip()
-            raise CalendarError(f"icalPal failed: {message}")
+        ek_events = store.eventsMatchingPredicate_(predicate)
 
-        return parse_icalpal_events(completed.stdout)
+        events: list[MeetingEvent] = []
+        for ek_event in ek_events or []:
+            if not self.settings.calendar.include_all_day and ek_event.isAllDay():
+                continue
+            meeting = _ekevent_to_meeting(ek_event)
+            if meeting is not None:
+                events.append(meeting)
+        return events
 
     def fetch_upcoming(self, now: datetime) -> list[MeetingEvent]:
         """Fetch upcoming candidate meetings."""
@@ -64,158 +202,17 @@ class IcalPalClient:
         ]
 
     def validate_access(self) -> tuple[bool, str]:
-        """Check that icalPal is callable and can read the Calendar DB."""
-        now = datetime.now().replace(second=0, microsecond=0)
-        end = now + timedelta(minutes=1)
-        command = [
-            self.settings.calendar.icalpal_path,
-            "-o",
-            "json",
-            "-c",
-            "events",
-            f"--from={now.isoformat()}",
-            f"--to={end.isoformat()}",
-            "--uid",
-            "--aep=all",
-            "--li=1",
-        ]
-        if not self.settings.calendar.include_all_day:
-            command.append("--ea")
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if completed.returncode != 0:
-            message = completed.stderr.strip() or completed.stdout.strip()
-            return False, f"{shell_join(command)} :: {message}"
-        return True, "icalPal calendar query succeeded"
-
-
-def parse_icalpal_events(payload: str) -> list[MeetingEvent]:
-    """Parse the loose JSON that icalPal returns."""
-    if not payload.strip():
-        return []
-    data = json.loads(payload)
-    if isinstance(data, dict):
-        if "events" in data and isinstance(data["events"], list):
-            records = data["events"]
-        elif "items" in data and isinstance(data["items"], list):
-            records = data["items"]
-        else:
-            records = [data]
-    else:
-        records = data
-    return [_parse_event_record(record) for record in records if isinstance(record, dict)]
-
-
-def _parse_event_record(record: dict[str, object]) -> MeetingEvent:
-    uid = str(first_non_empty([record.get("uid"), record.get("UUID"), record.get("id")]) or "")
-    title = str(first_non_empty([record.get("title"), record.get("summary"), record.get("name")]) or "")
-    start = parse_datetime(
-        first_non_empty(
-            [
-                record.get("start"),
-                record.get("sctime"),
-                record.get("sdate"),
-                record.get("startDate"),
-                record.get("datetime"),
-                record.get("date"),
-                record.get("start_date"),
-            ]
-        )
-    )
-    end = parse_datetime(
-        first_non_empty(
-            [
-                record.get("end"),
-                record.get("ectime"),
-                record.get("edate"),
-                record.get("endDate"),
-                record.get("end_date"),
-            ]
-        )
-    )
-    if not uid or not title or start is None:
-        raise CalendarError(f"Could not parse icalPal event record: {record}")
-
-    attendees = _parse_attendees(record.get("attendees"))
-    organizer = _parse_person(record.get("organizer"))
-    return MeetingEvent(
-        uid=uid,
-        title=title,
-        start=start,
-        end=end,
-        calendar_name=_string_or_none(
-            first_non_empty([record.get("calendar"), record.get("calendar_name")])
-        ),
-        organizer_name=organizer.get("name"),
-        organizer_email=organizer.get("email"),
-        location=_string_or_none(record.get("location")),
-        notes=_string_or_none(first_non_empty([record.get("notes"), record.get("description")])),
-        url=_string_or_none(first_non_empty([record.get("url"), record.get("conference_url")])),
-        attendees=attendees,
-        raw=record,
-    )
-
-
-def _parse_attendees(value: object) -> list[dict[str, str]]:
-    if value is None:
-        return []
-    attendees: list[dict[str, str]] = []
-    if isinstance(value, list):
-        for item in value:
-            if item is None:
-                continue
-            if isinstance(item, dict):
-                attendees.append(
-                    {
-                        "name": str(first_non_empty([item.get("name"), item.get("display_name")]) or ""),
-                        "email": str(
-                            first_non_empty([item.get("email"), item.get("address")]) or ""
-                        ).lower(),
-                    }
-                )
-            else:
-                attendees.extend(_parse_attendee_strings([str(item)]))
-        return [item for item in attendees if item.get("name") or item.get("email")]
-    if isinstance(value, str):
-        return _parse_attendee_strings(value.splitlines())
-    return []
-
-
-def _parse_attendee_strings(values: Iterable[str]) -> list[dict[str, str]]:
-    attendees: list[dict[str, str]] = []
-    for item in values:
-        text = item.strip()
-        if not text:
-            continue
-        if "<" in text and text.endswith(">"):
-            name, email = text.rsplit("<", 1)
-            attendees.append({"name": name.strip(), "email": email[:-1].strip().lower()})
-        elif "@" in text:
-            attendees.append({"name": "", "email": text.lower()})
-        else:
-            attendees.append({"name": text, "email": ""})
-    return attendees
-
-
-def _parse_person(value: object) -> dict[str, str]:
-    if isinstance(value, dict):
-        return {
-            "name": str(first_non_empty([value.get("name"), value.get("display_name")]) or ""),
-            "email": str(first_non_empty([value.get("email"), value.get("address")]) or "").lower(),
-        }
-    if isinstance(value, str):
-        parsed = _parse_attendee_strings([value])
-        if parsed:
-            return parsed[0]
-    return {}
-
-
-def _string_or_none(value: object) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+        """Check that EventKit can access the Calendar store."""
+        try:
+            store = _get_event_store()
+            _request_access(store)
+            return True, "EventKit calendar access granted"
+        except CalendarError as exc:
+            return False, str(exc)
+        except ImportError:
+            return False, (
+                "pyobjc-framework-EventKit is not installed. "
+                "Run: uv add pyobjc-framework-EventKit"
+            )
+        except Exception as exc:
+            return False, f"EventKit access check failed: {exc}"

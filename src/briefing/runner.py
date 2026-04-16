@@ -7,7 +7,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .calendar import IcalPalClient
+from .calendar import EventKitClient
 from .llm import LLMError, get_provider
 from .matching import match_series
 from .models import MeetingEvent, OccurrenceState, SeriesConfig
@@ -32,7 +32,7 @@ def run_briefing(
     series_configs = load_series_configs(settings)
     env = load_env_file(settings.paths.env_file)
     state_store = StateStore(settings)
-    calendar = IcalPalClient(settings)
+    calendar = EventKitClient(settings)
     provider = get_provider(settings)
 
     try:

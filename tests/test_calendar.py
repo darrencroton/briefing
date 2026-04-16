@@ -1,17 +1,84 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from briefing.calendar import parse_icalpal_events
+from briefing.calendar import EventKitClient, _ekevent_to_meeting
 
 
-def test_parse_icalpal_events_extracts_expected_fields() -> None:
-    payload = Path("tests/fixtures/icalpal/events.json").read_text(encoding="utf-8")
-    events = parse_icalpal_events(payload)
+def _make_ns_date(dt: datetime):
+    """Create a fake NSDate-like object from a datetime."""
+    return SimpleNamespace(timeIntervalSince1970=lambda: dt.timestamp())
 
-    assert len(events) == 1
-    event = events[0]
+
+def _make_url(email: str):
+    """Create a fake NSURL-like object with a mailto resource specifier."""
+    return SimpleNamespace(resourceSpecifier=lambda: f"//{email}")
+
+
+def _make_participant(name: str, email: str):
+    return SimpleNamespace(
+        name=lambda: name,
+        URL=lambda: _make_url(email) if email else None,
+    )
+
+
+def _make_ek_event(
+    *,
+    uid: str = "event-123",
+    title: str = "CAS Strategy Meeting",
+    start: datetime | None = None,
+    end: datetime | None = None,
+    calendar_title: str = "Work",
+    organizer_name: str | None = "Barry",
+    organizer_email: str | None = "barry@example.edu",
+    attendees: list[tuple[str, str]] | None = None,
+    location: str | None = "Building A",
+    notes: str | None = "Discuss staffing and budget.",
+    url: str | None = None,
+    is_all_day: bool = False,
+):
+    tz = timezone(timedelta(hours=10))
+    if start is None:
+        start = datetime(2026, 4, 13, 10, 0, tzinfo=tz)
+    if end is None:
+        end = datetime(2026, 4, 13, 11, 0, tzinfo=tz)
+    if attendees is None:
+        attendees = [("Darren", "darren@example.edu"), ("Barry", "barry@example.edu")]
+
+    organizer = None
+    if organizer_name or organizer_email:
+        organizer = SimpleNamespace(
+            name=lambda: organizer_name,
+            URL=lambda: _make_url(organizer_email) if organizer_email else None,
+        )
+
+    ek_attendees = [_make_participant(name, email) for name, email in attendees]
+
+    ek_calendar = SimpleNamespace(title=lambda: calendar_title) if calendar_title else None
+    ek_url = type("FakeURL", (), {"__str__": lambda self: url})() if url else None
+
+    return SimpleNamespace(
+        eventIdentifier=lambda: uid,
+        title=lambda: title,
+        startDate=lambda: _make_ns_date(start),
+        endDate=lambda: _make_ns_date(end) if end else None,
+        calendar=lambda: ek_calendar,
+        organizer=lambda: organizer,
+        attendees=lambda: ek_attendees,
+        location=lambda: location,
+        notes=lambda: notes,
+        URL=lambda: ek_url,
+        isAllDay=lambda: is_all_day,
+    )
+
+
+def test_ekevent_to_meeting_extracts_expected_fields() -> None:
+    ek_event = _make_ek_event()
+    event = _ekevent_to_meeting(ek_event)
+
+    assert event is not None
     assert event.uid == "event-123"
     assert event.title == "CAS Strategy Meeting"
     assert event.calendar_name == "Work"
@@ -20,54 +87,100 @@ def test_parse_icalpal_events_extracts_expected_fields() -> None:
     assert event.location == "Building A"
 
 
-def test_parse_icalpal_events_accepts_exchange_uuid_and_epoch_dates() -> None:
-    payload = """
-    [
-      {
-        "UUID": "D802F715-B20A-4EA7-BF93-C75815A49CD3",
-        "title": "Ray",
-        "calendar": "Calendar",
-        "start_date": 1776135600,
-        "end_date": 1776137400,
-        "start_tz": "Australia/Melbourne",
-        "end_tz": "Australia/Melbourne",
-        "attendees": [null]
-      }
-    ]
-    """
+def test_ekevent_to_meeting_handles_missing_organizer() -> None:
+    ek_event = _make_ek_event(organizer_name=None, organizer_email=None)
+    # Override organizer to return None
+    ek_event.organizer = lambda: None
+    event = _ekevent_to_meeting(ek_event)
 
-    events = parse_icalpal_events(payload)
+    assert event is not None
+    assert event.organizer_name is None
+    assert event.organizer_email is None
 
-    assert len(events) == 1
-    event = events[0]
-    assert event.uid == "D802F715-B20A-4EA7-BF93-C75815A49CD3"
-    assert event.title == "Ray"
-    assert event.calendar_name == "Calendar"
+
+def test_ekevent_to_meeting_handles_no_attendees() -> None:
+    ek_event = _make_ek_event(attendees=[])
+    event = _ekevent_to_meeting(ek_event)
+
+    assert event is not None
     assert event.attendees == []
-    assert event.start.timestamp() == datetime.fromtimestamp(1776135600).timestamp()
-    assert event.end is not None
-    assert event.end.timestamp() == datetime.fromtimestamp(1776137400).timestamp()
+    assert event.attendee_emails == []
 
 
-def test_parse_icalpal_events_prefers_normalized_icalpal_dates_over_raw_ical_epoch() -> None:
-    payload = """
-    [
-      {
-        "UUID": "05C4D883-0BC7-4C2A-9A72-12F28B01B63E",
-        "title": "Barry",
-        "calendar": "Calendar",
-        "start_date": 797839500,
-        "end_date": 797843100,
-        "sdate": "2026-04-14T16:15:00+10:00",
-        "edate": "2026-04-14T17:15:00+10:00"
-      }
-    ]
-    """
+def test_ekevent_to_meeting_returns_none_for_missing_uid() -> None:
+    ek_event = _make_ek_event(uid="")
+    assert _ekevent_to_meeting(ek_event) is None
 
-    events = parse_icalpal_events(payload)
+
+def test_ekevent_to_meeting_returns_none_for_missing_title() -> None:
+    ek_event = _make_ek_event(title="")
+    assert _ekevent_to_meeting(ek_event) is None
+
+
+def test_ekevent_to_meeting_returns_none_for_missing_start() -> None:
+    ek_event = _make_ek_event()
+    ek_event.startDate = lambda: None
+    assert _ekevent_to_meeting(ek_event) is None
+
+
+def test_ekevent_to_meeting_handles_none_end_date() -> None:
+    ek_event = _make_ek_event()
+    ek_event.endDate = lambda: None
+    event = _ekevent_to_meeting(ek_event)
+
+    assert event is not None
+    assert event.end is None
+
+
+def test_ekevent_to_meeting_captures_url() -> None:
+    ek_event = _make_ek_event(url="https://meet.example.com/abc")
+    event = _ekevent_to_meeting(ek_event)
+
+    assert event is not None
+    assert event.url == "https://meet.example.com/abc"
+
+
+def test_eventkit_client_fetch_events_filters_all_day(app_settings) -> None:
+    all_day_event = _make_ek_event(uid="all-day-1", is_all_day=True)
+    normal_event = _make_ek_event(uid="normal-1", is_all_day=False)
+
+    fake_store = SimpleNamespace(
+        predicateForEventsWithStartDate_endDate_calendars_=lambda s, e, c: "predicate",
+        eventsMatchingPredicate_=lambda p: [all_day_event, normal_event],
+        calendarsForEntityType_=lambda t: [],
+    )
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        events = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
 
     assert len(events) == 1
-    event = events[0]
-    assert event.start.isoformat() == "2026-04-14T16:15:00+10:00"
-    assert event.end is not None
-    assert event.end.isoformat() == "2026-04-14T17:15:00+10:00"
+    assert events[0].uid == "normal-1"
+
+
+def test_eventkit_client_fetch_events_includes_all_day_when_configured(app_settings) -> None:
+    app_settings.calendar.include_all_day = True
+    all_day_event = _make_ek_event(uid="all-day-1", is_all_day=True)
+    normal_event = _make_ek_event(uid="normal-1", is_all_day=False)
+
+    fake_store = SimpleNamespace(
+        predicateForEventsWithStartDate_endDate_calendars_=lambda s, e, c: "predicate",
+        eventsMatchingPredicate_=lambda p: [all_day_event, normal_event],
+        calendarsForEntityType_=lambda t: [],
+    )
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store), \
+         patch("briefing.calendar._request_access"), \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        events = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+
+    assert len(events) == 2

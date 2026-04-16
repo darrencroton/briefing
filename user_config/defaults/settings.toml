@@ -16,7 +16,6 @@ window_max_minutes = 45
 # Calendar names can be a single quoted string or a list of quoted strings.
 include_calendar_names = []
 exclude_calendar_names = []
-icalpal_path = "icalPal"
 lookback_days_for_init = 14
 
 [execution]

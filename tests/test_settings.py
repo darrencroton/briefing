@@ -25,7 +25,6 @@ window_min_minutes = 15
 window_max_minutes = 45
 include_calendar_names = []
 exclude_calendar_names = []
-icalpal_path = "icalPal"
 lookback_days_for_init = 14
 
 [execution]

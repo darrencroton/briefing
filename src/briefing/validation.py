@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .calendar import IcalPalClient
+from .calendar import EventKitClient
 from .llm import get_provider
 from .models import ValidationMessage
 from .settings import AppSettings, load_env_file
@@ -43,9 +43,9 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
             ValidationMessage("info", "series_configs_ok", f"Loaded {len(series_configs)} series config(s)")
         )
 
-    ical_client = IcalPalClient(settings)
-    ok, message = ical_client.validate_access()
-    messages.append(ValidationMessage("info" if ok else "error", "icalpal", message))
+    calendar_client = EventKitClient(settings)
+    ok, message = calendar_client.validate_access()
+    messages.append(ValidationMessage("info" if ok else "error", "eventkit", message))
 
     provider = get_provider(settings)
     ok, message = provider.validate()

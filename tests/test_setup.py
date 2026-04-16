@@ -31,7 +31,6 @@ window_min_minutes = 15
 window_max_minutes = 45
 include_calendar_names = []
 exclude_calendar_names = []
-icalpal_path = "icalPal"
 lookback_days_for_init = 14
 
 [execution]
@@ -280,14 +279,14 @@ def test_init_series_scaffolds_dm_conversation_ids(tmp_path: Path, monkeypatch: 
         attendees=[{"email": "darren@example.edu"}],
     )
 
-    class FakeIcalPalClient:
+    class FakeEventKitClient:
         def __init__(self, _settings):
             pass
 
         def fetch_events(self, _start, _end):
             return [event]
 
-    monkeypatch.setattr("briefing.main.IcalPalClient", FakeIcalPalClient)
+    monkeypatch.setattr("briefing.main.EventKitClient", FakeEventKitClient)
 
     exit_code = _init_series(settings, event_uid=None, index=None, force=False)
 
