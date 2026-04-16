@@ -8,7 +8,7 @@ The default target is Obsidian, but the output is plain Markdown and the notes d
 
 On each run, `briefing`:
 
-1. reads upcoming events from Apple Calendar through `icalPal`
+1. reads upcoming events from Apple Calendar through EventKit
 2. matches events against explicit YAML meeting-series rules in `user_config/series/`
 3. collects context from the configured sources for that series
 4. sends a prompt to the configured LLM CLI
@@ -28,7 +28,7 @@ Core behavior:
 
 - Python `3.13+` application managed with `uv`
 - CLI commands: `briefing run`, `briefing validate`, `briefing init-series`
-- Apple Calendar ingestion via `icalPal`
+- Apple Calendar ingestion via EventKit
 - Explicit series configuration under `user_config/series/*.yaml`
 - Sources: `previous_note`, `slack`, `notion`, `file`
 - Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`
@@ -39,9 +39,9 @@ Core behavior:
 
 ### Requirements
 
+- macOS (EventKit requires Apple Calendar access)
 - Python `3.13+`
 - `uv` on `PATH`
-- `icalPal` available on `PATH` or configured by absolute path
 - One supported LLM CLI authenticated for non-interactive use
 
 Supported LLM CLIs:
@@ -66,7 +66,7 @@ The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"
 The main settings file controls:
 
 - `[paths]`: notes location, runtime directories, templates, and env file
-- `[calendar]`: lead window and `icalPal` settings
+- `[calendar]`: lead window and calendar filter settings
 - `[execution]`: source concurrency and source timeout
 - `[output]`: note placeholder behavior
 - `[llm]`: provider, optional command override, model, and optional effort
@@ -101,7 +101,7 @@ This checks:
 
 - local paths and templates
 - series configuration presence
-- `icalPal` access
+- EventKit calendar access
 - selected LLM provider readiness
 - configured Slack and Notion auth
 - configured file source paths
@@ -204,7 +204,7 @@ archive/                  untracked retained local material
 
 ## Operational Notes
 
-- `icalPal` often needs Full Disk Access on macOS.
+- On first run, macOS will prompt for Calendar access. Grant it when prompted, or enable it in System Settings > Privacy & Security > Calendars.
 - The selected LLM CLI must already be authenticated before installing `launchd`.
 - `launchd` runs in the local Mac timezone.
 - The Mac must be awake for scheduled runs to happen on time.

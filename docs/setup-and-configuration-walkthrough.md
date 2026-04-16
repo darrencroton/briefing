@@ -18,7 +18,7 @@ Use the source-specific guides under [`source-guides/`](source-guides/README.md)
 
 The runtime flow is:
 
-1. query Apple Calendar through `icalPal`
+1. query Apple Calendar through EventKit
 2. match each upcoming event against `user_config/series/*.yaml`
 3. collect sources for the matched series
 4. render the prompt template
@@ -57,7 +57,6 @@ Start with these fields:
 
 - `paths.vault_root`
 - `paths.meeting_notes_dir`
-- `calendar.icalpal_path`
 - `llm.provider`
 - `llm.command` if you need an executable override
 - `llm.model`
@@ -68,11 +67,11 @@ The default `paths.series_dir` is already correct for the repo:
 paths.series_dir = "user_config/series"
 ```
 
-### 3. Make sure macOS access is available
+### 3. Grant Calendar access
 
-`briefing` depends on `icalPal` being able to read the local Apple Calendar database.
+`briefing` uses Apple's EventKit framework to read Calendar events. On first run, macOS will prompt for Calendar access. Grant it when prompted, or enable it in System Settings > Privacy & Security > Calendars.
 
-On current macOS versions this often means granting Full Disk Access to the terminal app or launcher you use to run `uv`.
+Run `uv run briefing validate` once interactively to trigger the permission prompt before installing `launchd` automation.
 
 ### 4. Add secrets only for the sources you use
 
@@ -95,7 +94,7 @@ For a minimal setup, validation should confirm:
 
 - vault root exists
 - prompt and note templates exist
-- `icalPal` works
+- EventKit calendar access is granted
 - the selected LLM provider is installed and automation-ready
 
 ### 6. Create your first series
@@ -209,7 +208,6 @@ When it writes a file, the generated YAML includes:
 - `window_max_minutes`: latest lead time to process
 - `include_calendar_names`: optional allow-list
 - `exclude_calendar_names`: optional block-list
-- `icalpal_path`: executable path or command name
 - `lookback_days_for_init`: forward search window used by `init-series`
 
 ### `[execution]`
@@ -268,7 +266,7 @@ Gemini ignores `llm.effort` and uses Gemini defaults.
 
 Typical failures:
 
-- `icalPal` is missing or lacks macOS access
+- EventKit calendar access is not granted
 - the selected LLM CLI is missing
 - the selected LLM CLI is installed but not authenticated for unattended use
 - required Slack or Notion tokens are missing for configured sources
@@ -282,13 +280,14 @@ Validation confirms provider readiness, but source-specific runtime issues can s
 
 ## Troubleshooting
 
-### `validate` says `icalPal` failed
+### `validate` says EventKit access failed
 
 Usually one of:
 
-- `icalPal` is not installed or not on `PATH`
-- the app running `uv` lacks Full Disk Access
-- the selected calendars are inaccessible
+- Calendar access was denied or not yet granted
+- the process is running in an environment without access to the macOS Calendar store
+
+Open System Settings > Privacy & Security > Calendars and enable access for your terminal app, or run `uv run briefing validate` interactively to trigger the permission prompt.
 
 ### `validate` says the LLM provider failed
 
@@ -320,7 +319,7 @@ This is usually intentional. If `Meeting Notes` differs from its placeholder, `b
 ## Recommended rollout order
 
 1. Set `vault_root` and `meeting_notes_dir`.
-2. Confirm `icalPal` and one LLM CLI work with `uv run briefing validate`.
+2. Confirm calendar access and one LLM CLI work with `uv run briefing validate`.
 3. Create one series with `uv run briefing init-series --index N`.
 4. Simplify that series until it matches reliably.
 5. Run `uv run briefing run` close to a real meeting.

@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta
 
 from .models import MeetingEvent
 from .settings import AppSettings
-
-logger = logging.getLogger(__name__)
 
 
 class CalendarError(RuntimeError):
@@ -80,7 +77,7 @@ def _ns_date(dt: datetime):
     return NSDate.dateWithTimeIntervalSince1970_(dt.timestamp())
 
 
-def _ekevent_to_meeting(event, calendar_names_lower: set[str] | None = None) -> MeetingEvent | None:
+def _ekevent_to_meeting(event) -> MeetingEvent | None:
     """Map an EKEvent to a MeetingEvent."""
     uid = event.eventIdentifier()
     title = event.title() or ""
@@ -164,13 +161,13 @@ class EventKitClient:
         exclude = {name.lower() for name in self.settings.calendar.exclude_calendar_names}
 
         if include:
-            calendars = [c for c in all_calendars if (c.title() or "").lower() in include]
-        elif exclude:
-            calendars = [c for c in all_calendars if (c.title() or "").lower() not in exclude]
-        else:
-            calendars = list(all_calendars)
-
-        return calendars or None  # None means "all" in the predicate
+            # Return only the matching calendars — an empty list is
+            # intentional when none match (produces zero events).
+            return [c for c in all_calendars if (c.title() or "").lower() in include]
+        if exclude:
+            return [c for c in all_calendars if (c.title() or "").lower() not in exclude]
+        # None means "all calendars" in the EventKit predicate.
+        return None
 
     def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
         """Fetch events in a specific window."""
