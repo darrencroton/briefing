@@ -151,6 +151,7 @@ def test_summarize_previous_note_extracts_title_from_compact_time_heading(app_se
     summary = summarize_previous_note(note_path)
 
     assert "Title: Barry" in summary
+    assert "## Briefing" not in summary
     assert "## Meeting Notes" not in summary
 
 
@@ -163,6 +164,7 @@ def test_summarize_previous_note_keeps_non_empty_meeting_notes(app_settings) -> 
 
     summary = summarize_previous_note(note_path)
 
+    assert "## Briefing" not in summary
     assert "## Meeting Notes\n- Send revised figures before Friday" in summary
 
 
@@ -175,6 +177,7 @@ def test_summarize_previous_note_includes_all_sections_after_meeting_notes(app_s
 
     summary = summarize_previous_note(note_path)
 
+    assert "## Briefing" not in summary
     assert "## Meeting Notes\n- Follow up with team" in summary
     assert "## Transcript Summary\n\n- Transcript says the draft is ready" in summary
     assert "### Action Items\n\n- Send the link" in summary

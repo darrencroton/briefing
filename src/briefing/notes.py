@@ -161,12 +161,9 @@ def summarize_previous_note(path: Path) -> str:
     """Return the high-value sections from a previous note."""
     text = path.read_text(encoding="utf-8")
     _, body = parse_frontmatter(text)
-    summary = extract_section(body, "Briefing")
     note_tail = extract_section_to_end(body, "Meeting Notes")
     title = _extract_title(body) or path.name
     parts = [f"Title: {title}"]
-    if summary:
-        parts.append("## Briefing\n" + summary)
     if _section_has_user_content(note_tail):
         parts.append("## Meeting Notes\n" + note_tail)
     return "\n\n".join(parts)

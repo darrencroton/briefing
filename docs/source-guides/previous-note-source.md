@@ -23,7 +23,6 @@ For each meeting occurrence, `briefing` looks for the most recent earlier note w
 If it finds one, it extracts the high-value parts of that note:
 
 - the note title
-- the previous `Briefing`
 - everything from the previous `Meeting Notes` heading to the end of the note
 
 That material is then passed into the next run as source context.
@@ -98,6 +97,8 @@ The previous-note summariser looks at the note structure that `briefing` writes:
 - `## Meeting Notes`
 
 Normal user editing from `Meeting Notes` onward is expected and useful. That whole tail of the note is part of what makes the previous-note source valuable, including additional same-level sections such as `## Transcript Summary`.
+
+The prior generated `## Briefing` is not fed back into the next run. This avoids summary-on-summary drift and keeps continuity grounded in user-owned note content.
 
 What matters is keeping the note as a normal `briefing` meeting note rather than turning it into an unrelated document format.
 
