@@ -173,7 +173,7 @@ def _build_frontmatter(
         "series_id": series.series_id,
         "start": event.start.isoformat(),
     }
-    return "---\n" + yaml.safe_dump(payload, sort_keys=False).strip() + "\n---"
+    return "---\n" + yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).strip() + "\n---"
 
 
 def _build_heading(event: MeetingEvent) -> str:

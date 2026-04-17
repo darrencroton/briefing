@@ -38,6 +38,8 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
         "series_id": "cas-strategy",
         "start": "2026-04-13T10:00:00+10:00",
     }
+    assert 'title: CAS Strategy Meeting 10–11am' in note
+    assert "\\u2013" not in note
     assert "[[2026-04-13]] | [[CAS Strategy Meeting Meetings]]" in note
     assert "## Briefing\n\n- First summary bullet" in note
     assert "## Meeting Notes\n\n- " in note
