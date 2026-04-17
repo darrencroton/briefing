@@ -31,7 +31,7 @@ Important behavior:
 - unconfigured meetings are skipped
 - matching uses explicit rules, not title-only heuristics
 - only the managed summary block is refreshed
-- edits in `Meeting Notes` lock that occurrence against further automated rewrites
+- edits from `Meeting Notes` onward lock that occurrence against further automated rewrites
 - required source failures block note generation
 
 ## Minimal first working setup
@@ -217,7 +217,7 @@ When it writes a file, the generated YAML includes:
 
 ### `[output]`
 
-- `meeting_notes_placeholder`: placeholder inserted into `Meeting Notes`
+- `meeting_notes_placeholder`: placeholder inserted at the start of the user-owned note area under `Meeting Notes`
 
 ### `[llm]`
 
@@ -305,7 +305,7 @@ Usually one of:
 - no meeting starts between `window_min_minutes` and `window_max_minutes`
 - no series matched the event
 - more than one series matched the event
-- the note was already locked because `Meeting Notes` were edited
+- the note was already locked because content from `Meeting Notes` onward was edited
 - the meeting had already started
 
 ### A series exists but never matches
@@ -314,7 +314,7 @@ Review the YAML match groups. The most common issue is over-constraining the ser
 
 ### A note was created once but no longer refreshes
 
-This is usually intentional. If `Meeting Notes` differs from its placeholder, `briefing` treats the occurrence as user-owned and stops rewriting it.
+This is usually intentional. If content from `Meeting Notes` onward differs from its placeholder, `briefing` treats that tail of the note as user-owned and stops rewriting the occurrence.
 
 ## Recommended rollout order
 

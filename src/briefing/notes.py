@@ -92,11 +92,11 @@ def _section_has_user_content(section_text: str) -> bool:
 
 
 def note_is_locked(settings: AppSettings, note_text: str) -> tuple[bool, str | None]:
-    """Determine whether user note sections have been edited."""
+    """Determine whether the user-owned note tail has been edited."""
     if not note_text.strip():
         return False, None
-    meeting_notes = extract_section(note_text, "Meeting Notes")
-    if _normalize_section_value(meeting_notes) != _normalize_section_value(
+    note_tail = extract_section_to_end(note_text, "Meeting Notes")
+    if _normalize_section_value(note_tail) != _normalize_section_value(
         settings.output.meeting_notes_placeholder
     ):
         return True, "meeting_notes_edited"
@@ -109,6 +109,15 @@ def extract_section(note_text: str, heading: str) -> str:
         rf"^## {re.escape(heading)}\n(?P<body>.*?)(?=^## |\Z)",
         re.MULTILINE | re.DOTALL,
     )
+    match = pattern.search(note_text)
+    if not match:
+        return ""
+    return match.group("body").strip()
+
+
+def extract_section_to_end(note_text: str, heading: str) -> str:
+    """Extract everything after a heading until the end of the note."""
+    pattern = re.compile(rf"^## {re.escape(heading)}\n(?P<body>.*)\Z", re.MULTILINE | re.DOTALL)
     match = pattern.search(note_text)
     if not match:
         return ""
@@ -153,13 +162,13 @@ def summarize_previous_note(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     _, body = parse_frontmatter(text)
     summary = extract_section(body, "Briefing")
-    meeting_notes = extract_section(body, "Meeting Notes")
+    note_tail = extract_section_to_end(body, "Meeting Notes")
     title = _extract_title(body) or path.name
     parts = [f"Title: {title}"]
     if summary:
         parts.append("## Briefing\n" + summary)
-    if _section_has_user_content(meeting_notes):
-        parts.append("## Meeting Notes\n" + meeting_notes)
+    if _section_has_user_content(note_tail):
+        parts.append("## Meeting Notes\n" + note_tail)
     return "\n\n".join(parts)
 
 

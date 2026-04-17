@@ -24,7 +24,7 @@ If it finds one, it extracts the high-value parts of that note:
 
 - the note title
 - the previous `Briefing`
-- the previous `Meeting Notes`
+- everything from the previous `Meeting Notes` heading to the end of the note
 
 That material is then passed into the next run as source context.
 
@@ -36,7 +36,7 @@ For many recurring meetings, the previous note becomes the most useful source af
 
 - unresolved actions
 - the last meeting’s context
-- any notes you wrote in the meeting itself
+- any notes or follow-up sections you kept after `Meeting Notes`
 
 In practice, many users can get good results from calendar plus previous note alone before adding Slack, Notion, or file sources.
 
@@ -97,7 +97,7 @@ The previous-note summariser looks at the note structure that `briefing` writes:
 - `## Briefing`
 - `## Meeting Notes`
 
-Normal user editing inside `Meeting Notes` is expected and useful. That content is part of what makes the previous-note source valuable.
+Normal user editing from `Meeting Notes` onward is expected and useful. That whole tail of the note is part of what makes the previous-note source valuable, including additional same-level sections such as `## Transcript Summary`.
 
 What matters is keeping the note as a normal `briefing` meeting note rather than turning it into an unrelated document format.
 

@@ -53,6 +53,27 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
     assert "<!-- BRIEFING:" not in refreshed
 
 
+def test_refresh_note_preserves_same_level_sections_after_meeting_notes() -> None:
+    note = (
+        "# Followup 10am–11am\n"
+        "[[2026-04-08]] | [[Followup Meetings]]\n\n"
+        "---\n"
+        "## Briefing\n\n"
+        "- Old summary\n\n"
+        "---\n"
+        "## Meeting Notes\n\n"
+        "- User note\n\n"
+        "## Transcript Summary\n\n"
+        "- AI-generated recap\n"
+    )
+
+    refreshed = refresh_note(note, "- New summary")
+
+    assert "## Briefing\n\n- New summary" in refreshed
+    assert "## Meeting Notes\n\n- User note" in refreshed
+    assert "## Transcript Summary\n\n- AI-generated recap" in refreshed
+
+
 def test_render_note_uses_compact_same_meridiem_time_window(app_settings, series_config) -> None:
     event = MeetingEvent(
         uid="event-1",
@@ -89,9 +110,11 @@ def test_render_note_keeps_both_meridiems_when_range_crosses(app_settings, serie
 def test_note_lock_detection_ignores_placeholder(app_settings) -> None:
     unlocked = "## Meeting Notes\n\n- \n"
     locked = "## Meeting Notes\n\n- Added an update\n"
+    locked_with_extra_section = "## Meeting Notes\n\n- \n\n## Transcript Summary\n\n- Added later\n"
 
     assert note_is_locked(app_settings, unlocked) == (False, None)
     assert note_is_locked(app_settings, locked) == (True, "meeting_notes_edited")
+    assert note_is_locked(app_settings, locked_with_extra_section) == (True, "meeting_notes_edited")
 
 
 def test_find_previous_note_uses_series_id_and_start(app_settings, series_config) -> None:
@@ -141,6 +164,20 @@ def test_summarize_previous_note_keeps_non_empty_meeting_notes(app_settings) -> 
     summary = summarize_previous_note(note_path)
 
     assert "## Meeting Notes\n- Send revised figures before Friday" in summary
+
+
+def test_summarize_previous_note_includes_all_sections_after_meeting_notes(app_settings) -> None:
+    note_path = app_settings.paths.meeting_notes_dir / "2026-04-08-1000-transcript.md"
+    note_path.write_text(
+        "---\nseries_id: transcript\nstart: 2026-04-08T10:00:00+10:00\n---\n\n# Transcript 10am–11am\n[[2026-04-08]] | [[Transcript Meetings]]\n\n---\n## Briefing\n\n- Review transcript\n\n---\n## Meeting Notes\n\n- Follow up with team\n\n## Transcript Summary\n\n- Transcript says the draft is ready\n\n### Action Items\n\n- Send the link\n",
+        encoding="utf-8",
+    )
+
+    summary = summarize_previous_note(note_path)
+
+    assert "## Meeting Notes\n- Follow up with team" in summary
+    assert "## Transcript Summary\n\n- Transcript says the draft is ready" in summary
+    assert "### Action Items\n\n- Send the link" in summary
 
 
 def test_normalize_summary_bullets_converts_lists() -> None:

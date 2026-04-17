@@ -24,7 +24,7 @@ Rules:
 - Prefer short lead-ins when they improve scanning, for example `Today:`, `Research update:`, `Decision point:`, `Next meeting:`, `Papers:`.
 - Lead with concrete outstanding actions from the previous note when they are still relevant.
 - Be explicit when an action is still open, but fold it into the surrounding context instead of making it a separate low-information bullet.
-- Extract actions and follow-ups from prior `Meeting Notes` when they matter for the upcoming meeting, even if there is no dedicated `Actions` section.
+- Extract actions and follow-ups from the prior note content carried forward from `Meeting Notes` onward when they matter for the upcoming meeting, even if they live in a later section such as `Transcript Summary` rather than a dedicated `Actions` section.
 - Highlight genuinely important follow-ups clearly, for example with lead-ins such as `Open action:` or `Next step:` when that improves scanning.
 - Do not cite sources by default. Mention a source, date, or channel only when it is necessary for clarity or confidence.
 - Never write Slack channel names with a leading `#`; if a channel must be mentioned, write `general`, not `#general`.
