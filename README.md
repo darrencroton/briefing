@@ -8,7 +8,7 @@ You choose which meetings get briefings and which sources feed each one. A short
 
 ### What a briefing looks like
 
-Each meeting note gets a `## Briefing` section with a handful of bullets — typically 3 to 6 — that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. No filler, no channel-wide noise, no generic summaries.
+Each meeting note gets a `## Briefing` section with a handful of bullets — typically 3 to 6 — that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. Each bullet ends with a compact source/date tag so you can see where the point came from. No filler, no channel-wide noise, no generic summaries.
 
 The rest of the note is yours. `briefing` only manages the briefing block; everything from `## Meeting Notes` onward is preserved and carried forward as previous-note context for the next briefing.
 
