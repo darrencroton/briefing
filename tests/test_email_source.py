@@ -158,6 +158,46 @@ def test_mail_adapter_fetch_messages_script_fetches_extended_body_without_messag
     assert "3000" in script
 
 
+def test_mail_adapter_fetch_messages_script_uses_text_slicing_for_zero_padding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = MailAdapter(timeout=5)
+    captured: dict[str, str] = {}
+
+    def fake_run(script: str):
+        captured["script"] = script
+        return 0, "", ""
+
+    monkeypatch.setattr(adapter, "_run_script", fake_run)
+    adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
+    script = captured["script"]
+    assert 'text -2 thru -1 of ("0" & (mo as string))' in script
+    assert "then set moS" not in script
+
+
+def test_mail_adapter_fetch_messages_script_pushes_email_address_filter_into_applescript(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = MailAdapter(timeout=5)
+    captured: dict[str, str] = {}
+
+    def fake_run(script: str):
+        captured["script"] = script
+        return 0, "", ""
+
+    monkeypatch.setattr(adapter, "_run_script", fake_run)
+    adapter.fetch_messages(
+        account=None,
+        mailboxes=[],
+        cutoff=_CUTOFF,
+        email_addresses=["alice@example.com"],
+    )
+    script = captured["script"]
+    assert 'set addressFilter to {"alice@example.com"}' in script
+    assert "if not includeMsg then" in script
+    assert "set rawBody to content of msg" in script
+
+
 def test_mail_adapter_fetch_messages_returns_empty_list_on_no_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

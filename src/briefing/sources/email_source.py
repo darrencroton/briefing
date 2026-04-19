@@ -64,10 +64,11 @@ class MailAdapter:
         account: str | None,
         mailboxes: list[str],
         cutoff: datetime,
+        email_addresses: list[str] | None = None,
     ) -> list[dict]:
         """Return messages from Apple Mail matching the given criteria."""
         cutoff_days = max(1, (datetime.now(timezone.utc) - cutoff).days)
-        script = _build_script(account, mailboxes, cutoff_days)
+        script = _build_script(account, mailboxes, cutoff_days, email_addresses or [])
         code, stdout, stderr = self._run_script(script)
         if code != 0:
             raise RuntimeError(stderr.strip() or "osascript returned non-zero exit code")
@@ -99,6 +100,7 @@ def _collect_one(
             account=config.account,
             mailboxes=config.mailboxes,
             cutoff=cutoff,
+            email_addresses=config.email_addresses,
         )
     except (subprocess.SubprocessError, subprocess.TimeoutExpired, RuntimeError, OSError) as exc:
         return SourceResult(
@@ -193,6 +195,7 @@ def _build_script(
     account: str | None,
     mailboxes: list[str],
     cutoff_days: int,
+    email_addresses: list[str],
 ) -> str:
     account_filter = account.replace('"', '\\"') if account else ""
     if mailboxes:
@@ -200,12 +203,21 @@ def _build_script(
         mbox_list = "{" + mbox_items + "}"
     else:
         mbox_list = "{}"
+    if email_addresses:
+        address_items = ", ".join(
+            f'"{email.lower().replace(chr(34), chr(92) + chr(34))}"'
+            for email in email_addresses
+        )
+        address_list = "{" + address_items + "}"
+    else:
+        address_list = "{}"
 
     return f"""\
 tell application "Mail"
     set cutoffDate to (current date) - ({cutoff_days} * days)
     set accountFilter to "{account_filter}"
     set mailboxFilter to {mbox_list}
+    set addressFilter to {address_list}
     set output to ""
     set targetAccounts to every account
     repeat with acct in targetAccounts
@@ -216,16 +228,43 @@ tell application "Mail"
                     try
                         set msgs to (messages of mbox whose date received >= cutoffDate)
                         repeat with msg in msgs
+                            set includeMsg to ((count of addressFilter) is 0)
+                            if not includeMsg then
+                                set senderText to (sender of msg) as string
+                                repeat with addr in addressFilter
+                                    if senderText contains (addr as string) then
+                                        set includeMsg to true
+                                        exit repeat
+                                    end if
+                                end repeat
+                            end if
+                            set recips to to recipients of msg
+                            if not includeMsg then
+                                repeat with r in recips
+                                    set recipAddress to (address of r) as string
+                                    repeat with addr in addressFilter
+                                        if recipAddress is (addr as string) then
+                                            set includeMsg to true
+                                            exit repeat
+                                        end if
+                                    end repeat
+                                    if includeMsg then exit repeat
+                                end repeat
+                            end if
+                            if not includeMsg then
+                                -- Skip body extraction for unrelated messages to keep large mailboxes fast.
+                                set recips to {{}}
+                            else
                             set d to date received of msg
                             set yr to year of d as string
                             set mo to (month of d as integer)
                             set dy to day of d
                             set hr to hours of d
                             set mn to minutes of d
-                            if mo < 10 then set moS to "0" & mo else set moS to (mo as string)
-                            if dy < 10 then set dyS to "0" & dy else set dyS to (dy as string)
-                            if hr < 10 then set hrS to "0" & hr else set hrS to (hr as string)
-                            if mn < 10 then set mnS to "0" & mn else set mnS to (mn as string)
+                            set moS to text -2 thru -1 of ("0" & (mo as string))
+                            set dyS to text -2 thru -1 of ("0" & (dy as string))
+                            set hrS to text -2 thru -1 of ("0" & (hr as string))
+                            set mnS to text -2 thru -1 of ("0" & (mn as string))
                             set dateStr to yr & "-" & moS & "-" & dyS & " " & hrS & ":" & mnS
                             set rawBody to content of msg
                             if (count of characters in rawBody) > {_RAW_BODY_FETCH_CHARS} then
@@ -241,11 +280,11 @@ tell application "Mail"
                                 end if
                             end repeat
                             set toAddrs to ""
-                            set recips to to recipients of msg
                             repeat with r in recips
                                 set toAddrs to toAddrs & (address of r) & ","
                             end repeat
                             set output to output & "<<MSG>>" & linefeed & "date: " & dateStr & linefeed & "from: " & (sender of msg) & linefeed & "to: " & toAddrs & linefeed & "subject: " & (subject of msg) & linefeed & "body: " & cleanBody & linefeed
+                            end if
                         end repeat
                     end try
                 end if
