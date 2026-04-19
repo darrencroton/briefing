@@ -10,8 +10,9 @@ from briefing.models import EmailSourceConfig, MeetingEvent
 from briefing.sources.email_source import (
     MailAdapter,
     collect_email_sources,
-    _parse_sender,
+    _extract_body_preview,
     _format_messages,
+    _parse_sender,
 )
 from briefing.sources.types import SourceContext
 
@@ -130,7 +131,7 @@ def test_mail_adapter_fetch_messages_parses_output(
 ) -> None:
     adapter = MailAdapter(timeout=5)
     monkeypatch.setattr(adapter, "_run_script", lambda _script: (0, _RAW_OUTPUT, ""))
-    msgs = adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF, max_messages=20)
+    msgs = adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
     assert len(msgs) == 1
     assert msgs[0]["subject"] == "Re: Q2 Planning"
     assert msgs[0]["from_email"] == "ben@example.com"
@@ -139,12 +140,30 @@ def test_mail_adapter_fetch_messages_parses_output(
     assert "darren@example.com" in msgs[0]["to_emails"]
 
 
+def test_mail_adapter_fetch_messages_script_fetches_extended_body_without_message_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = MailAdapter(timeout=5)
+    captured: dict[str, str] = {}
+
+    def fake_run(script: str):
+        captured["script"] = script
+        return 0, "", ""
+
+    monkeypatch.setattr(adapter, "_run_script", fake_run)
+    adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
+    script = captured["script"]
+    assert "set maxCount" not in script
+    assert "set msgCount" not in script
+    assert "3000" in script
+
+
 def test_mail_adapter_fetch_messages_returns_empty_list_on_no_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = MailAdapter(timeout=5)
     monkeypatch.setattr(adapter, "_run_script", lambda _script: (0, "", ""))
-    msgs = adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF, max_messages=20)
+    msgs = adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
     assert msgs == []
 
 
@@ -154,7 +173,7 @@ def test_mail_adapter_fetch_messages_raises_on_non_zero_exit(
     adapter = MailAdapter(timeout=5)
     monkeypatch.setattr(adapter, "_run_script", lambda _script: (1, "", "not authorized"))
     with pytest.raises(RuntimeError, match="not authorized"):
-        adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF, max_messages=20)
+        adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
 
 
 def test_mail_adapter_fetch_messages_propagates_subprocess_error(
@@ -167,7 +186,7 @@ def test_mail_adapter_fetch_messages_propagates_subprocess_error(
 
     monkeypatch.setattr(adapter, "_run_script", fail)
     with pytest.raises(subprocess.SubprocessError):
-        adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF, max_messages=20)
+        adapter.fetch_messages(account=None, mailboxes=[], cutoff=_CUTOFF)
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +268,27 @@ def test_collect_email_sources_filters_by_to_email(
     assert "Unrelated" not in results[0].content
 
 
+def test_collect_email_sources_email_addresses_match_any_configured_address(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    series_config,
+) -> None:
+    config = EmailSourceConfig(email_addresses=["ben@work.example", "ben@personal.example"])
+    msgs = [
+        {"subject": "Work", "from_name": "Ben", "from_email": "ben@work.example", "to_emails": [], "date": "2026-04-16 09:00", "body": "Work update"},
+        {"subject": "Personal", "from_name": "Ben", "from_email": "ben@personal.example", "to_emails": [], "date": "2026-04-16 08:30", "body": "Personal update"},
+        {"subject": "Other", "from_name": "Ben", "from_email": "other@example.com", "to_emails": [], "date": "2026-04-16 08:00", "body": "Other update"},
+    ]
+    monkeypatch.setattr(
+        "briefing.sources.email_source.MailAdapter.fetch_messages",
+        lambda *_args, **_kwargs: msgs,
+    )
+    results = collect_email_sources(_make_context(app_settings, series_config), [config])
+    assert "Work" in results[0].content
+    assert "Personal" in results[0].content
+    assert "Other" not in results[0].content
+
+
 def test_collect_email_sources_filters_by_subject_regex(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,
@@ -321,6 +361,28 @@ def test_collect_email_sources_returns_one_result_per_config(
     assert all(r.label == "Emails related to CAS Strategy Meeting" for r in results)
 
 
+def test_collect_email_sources_keeps_most_recent_messages_after_global_sort(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    series_config,
+) -> None:
+    config = EmailSourceConfig(max_messages=2)
+    msgs = [
+        {"subject": "Oldest", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-14 09:00", "body": "Old"},
+        {"subject": "Newest", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 11:00", "body": "New"},
+        {"subject": "Middle", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-15 10:00", "body": "Mid"},
+    ]
+    monkeypatch.setattr(
+        "briefing.sources.email_source.MailAdapter.fetch_messages",
+        lambda *_args, **_kwargs: msgs,
+    )
+    results = collect_email_sources(_make_context(app_settings, series_config), [config])
+    content = results[0].content
+    assert "Newest" in content
+    assert "Middle" in content
+    assert "Oldest" not in content
+
+
 # ---------------------------------------------------------------------------
 # _format_messages
 # ---------------------------------------------------------------------------
@@ -350,3 +412,15 @@ def test_format_messages_groups_by_date_descending() -> None:
     ]
     out = _format_messages(msgs, "Label", 7, [])
     assert out.index("Later") < out.index("Earlier")
+
+
+def test_extract_body_preview_strips_reply_chain_noise() -> None:
+    raw = (
+        "Let's do Thursday morning."
+        "__BRIEFING_PARA__I will send the figures shortly."
+        "__BRIEFING_PARA__"
+        "__BRIEFING_PARA__On Tue, 15 Apr 2026, Ben wrote:"
+        "__BRIEFING_PARA__> Earlier context"
+    )
+    out = _extract_body_preview(raw)
+    assert out == "Let's do Thursday morning.\nI will send the figures shortly."

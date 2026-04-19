@@ -212,7 +212,10 @@ def process_event(
         debug_output_path.write_text(llm_response.raw, encoding="utf-8")
 
     summary_hash = sha256_text(llm_response.text)
-    source_hashes = {source.label: sha256_text(source.content) for source in usable_sources}
+    source_hashes = {
+        _source_hash_key(index, source): sha256_text(source.content)
+        for index, source in enumerate(usable_sources)
+    }
     if output_path.exists() and state.summary_hash == summary_hash and state.source_hashes == source_hashes:
         state.last_status = "unchanged"
         state.last_generated_at = now.isoformat()
@@ -252,6 +255,11 @@ def process_event(
         "dry_run": dry_run,
         "source_results": [asdict(source) for source in sources],
     }
+
+
+def _source_hash_key(index: int, source: SourceResult) -> str:
+    """Build a stable state key without assuming labels are unique."""
+    return f"{index}:{source.source_type}:{source.label}"
 
 
 def render_or_refresh_note(

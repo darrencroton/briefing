@@ -42,8 +42,9 @@ What `briefing` reads for each configured email source:
 
 - the subject line
 - the sender name and address
+- the `To` addresses
 - the date and time received
-- the first 400 characters of the message body
+- recent body text, after stripping obvious quoted reply history and signatures
 
 It does not read attachments, read receipts, or private metadata beyond those fields.
 
@@ -87,6 +88,8 @@ You can list multiple addresses. `briefing` keeps emails where any of the config
 ```yaml
 email_addresses: [ben@example.com, alice@example.com]
 ```
+
+This is OR logic, not AND. The email source keeps a message if any configured address appears in `From` or `To`.
 
 ### Filter by mailbox
 
@@ -170,7 +173,7 @@ sources:
       subject_regex_any: []
       history_days: 7
       max_messages: 20
-      max_characters: 10000
+      max_characters: 20000
       required: false
 ```
 
@@ -196,9 +199,15 @@ Available fields:
 | `mailboxes` | no | all mailboxes | Mailbox names to search; OR logic |
 | `subject_regex_any` | no | `[]` | Case-insensitive Python regex patterns; OR logic |
 | `history_days` | no | 7 | Lookback window |
-| `max_messages` | no | 20 | Cap on messages returned before truncation |
-| `max_characters` | no | 10000 | Cap on formatted output before truncation |
+| `max_messages` | no | 20 | Cap on the most recent matched messages after global date sorting |
+| `max_characters` | no | 20000 | Cap on formatted output before truncation |
 | `required` | no | `false` | Block note generation if this source fails |
+
+Notes on sizing:
+
+- `briefing` fetches up to 3000 raw characters per message from Apple Mail.
+- Python strips obvious quoted reply history and signatures, then keeps up to 2000 characters of the cleaned body per message.
+- There is no extra app-level prompt truncation after source collection; the practical input budget is controlled by each source's `max_characters`.
 
 ### Should the Email Source Be Required?
 
@@ -300,7 +309,9 @@ The email source is intentionally narrow:
 
 - it reads recent messages from Apple Mail on the local machine
 - it filters by sender, mailbox, and subject; it does not do full-text search of message bodies
-- it reads the first 400 characters of each message body; it does not parse full threads
+- it prefers the most recent matched messages first when `max_messages` is reached
+- it strips obvious quoted reply history and signatures before passing body text to the LLM
+- it does not reconstruct full threads
 - it does not read attachments
 - it does not connect to your mail server directly
 - it does not search across all email automatically from meeting names

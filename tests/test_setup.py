@@ -70,7 +70,7 @@ max_characters = 20000
 [email]
 history_days = 7
 max_messages = 20
-max_characters = 10000
+max_characters = 20000
 request_timeout_seconds = 30
 
 [logging]

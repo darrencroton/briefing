@@ -231,6 +231,7 @@ When it writes a file, the generated YAML includes:
 - `max_output_tokens`: retained in config but not used by the current provider implementation
 - `prompt_template`: prompt template filename under `user_config/prompts/`
 - `note_template`: note template filename under `user_config/templates/`
+- `briefing` does not apply a separate global prompt truncation step after source collection; source-specific `max_characters` settings are the real input budget
 
 Gemini ignores `llm.effort` and uses Gemini defaults.
 
@@ -250,6 +251,13 @@ Gemini ignores `llm.effort` and uses Gemini defaults.
 
 ### `[files]`
 
+- `max_characters`
+
+### `[email]`
+
+- `history_days`
+- `request_timeout_seconds`
+- `max_messages`
 - `max_characters`
 
 ### `[logging]`

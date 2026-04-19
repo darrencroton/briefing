@@ -95,7 +95,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
         email=EmailSettings(
             history_days=7,
             max_messages=20,
-            max_characters=10000,
+            max_characters=20000,
             request_timeout_seconds=5,
         ),
         logging=LoggingSettings(

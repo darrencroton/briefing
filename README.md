@@ -2,7 +2,7 @@
 
 You have a recurring meeting in ten minutes. Over the past week you've traded Slack messages with the person, there are open items from last time, and a couple of Notion pages have been updated. You could spend the next ten minutes skimming all of that — or you could open your meeting note and find a short, focused summary already waiting for you.
 
-`briefing` does that. It reads your Apple Calendar, and for each meeting series you configure, it pulls recent context from the sources you actually use — Slack channels and DMs, Notion pages, local files, and the previous meeting note — sends it to an LLM, and writes a concise pre-meeting briefing into a Markdown note. The note lands in Obsidian (or any Markdown workspace you point it at), ready to glance at before you walk in.
+`briefing` does that. It reads your Apple Calendar, and for each meeting series you configure, it pulls recent context from the sources you actually use — Slack channels and DMs, Notion pages, local files, Apple Mail, and the previous meeting note — sends it to an LLM, and writes a concise pre-meeting briefing into a Markdown note. The note lands in Obsidian (or any Markdown workspace you point it at), ready to glance at before you walk in.
 
 You choose which meetings get briefings and which sources feed each one. A short YAML file per meeting series is all it takes. Everything runs locally on your Mac, on a schedule or on demand.
 
@@ -30,7 +30,7 @@ Only meetings you have explicitly configured are processed. If a required source
 - CLI commands: `briefing run`, `briefing validate`, `briefing init-series`
 - Apple Calendar ingestion via EventKit
 - Explicit series configuration under `user_config/series/*.yaml`
-- Sources: `previous_note`, `slack`, `notion`, `file`
+- Sources: `previous_note`, `slack`, `notion`, `file`, `email`
 - Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`
 - Local state and diagnostics under `state/`
 - `launchd` helper scripts for unattended macOS runs
@@ -70,7 +70,7 @@ The main settings file controls:
 - `[execution]`: source concurrency and source timeout
 - `[output]`: note placeholder behavior
 - `[llm]`: provider, optional command override, model, and optional effort
-- `[slack]`, `[notion]`, `[files]`: source defaults
+- `[slack]`, `[notion]`, `[files]`, `[email]`: source defaults
 - `[logging]`: log paths and debug toggles
 
 Common LLM setups:
@@ -105,6 +105,7 @@ This checks:
 - selected LLM provider readiness
 - configured Slack and Notion auth
 - configured file source paths
+- Apple Mail automation access for configured email sources
 
 ### 5. Create your first series config
 
@@ -169,6 +170,7 @@ Available source adapters:
 - `slack`: selected channels or DM conversations
 - `notion`: selected standing pages
 - `file`: local or synced text files
+- `email`: Apple Mail messages filtered by account, mailbox, address, or subject
 
 Source-specific guides:
 
@@ -176,6 +178,7 @@ Source-specific guides:
 - [`docs/source-guides/slack-source-setup.md`](docs/source-guides/slack-source-setup.md)
 - [`docs/source-guides/notion-source-setup.md`](docs/source-guides/notion-source-setup.md)
 - [`docs/source-guides/file-source-setup.md`](docs/source-guides/file-source-setup.md)
+- [`docs/source-guides/email-source-setup.md`](docs/source-guides/email-source-setup.md)
 
 ## Repository Layout
 

@@ -27,6 +27,7 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 - Treat required source failures as blocking.
 - Prefer local-first operation and minimal moving parts.
 - Keep output as portable Markdown wherever practical, even when the default workflow is Obsidian-first.
+- For the email source, prefer the most recent matched messages and preserve meaningful new content rather than quoted reply-chain noise.
 
 ## Repo Conventions
 

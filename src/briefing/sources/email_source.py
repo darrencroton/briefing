@@ -11,7 +11,20 @@ from ..models import EmailSourceConfig, SourceResult
 from ..utils import shorten_text
 from .types import SourceContext
 
-_BODY_PREVIEW_CHARS = 400
+_RAW_BODY_FETCH_CHARS = 3000
+_BODY_PREVIEW_CHARS = 2000
+_PARAGRAPH_SEPARATOR = "__BRIEFING_PARA__"
+_REPLY_HEADER_PATTERNS = (
+    re.compile(r"^on .+ wrote:$", re.IGNORECASE),
+    re.compile(r"^from:\s", re.IGNORECASE),
+    re.compile(r"^sent:\s", re.IGNORECASE),
+    re.compile(r"^to:\s", re.IGNORECASE),
+    re.compile(r"^subject:\s", re.IGNORECASE),
+    re.compile(r"^(begin )?forwarded message:?$", re.IGNORECASE),
+    re.compile(r"^-{2,}\s*original message\s*-{2,}$", re.IGNORECASE),
+    re.compile(r"^-{2,}\s*forwarded message\s*-{2,}$", re.IGNORECASE),
+)
+_SIGNATURE_MARKERS = ("--", "__", "sent from my ")
 
 
 class MailAdapter:
@@ -51,11 +64,10 @@ class MailAdapter:
         account: str | None,
         mailboxes: list[str],
         cutoff: datetime,
-        max_messages: int,
     ) -> list[dict]:
         """Return messages from Apple Mail matching the given criteria."""
         cutoff_days = max(1, (datetime.now(timezone.utc) - cutoff).days)
-        script = _build_script(account, mailboxes, cutoff_days, max_messages)
+        script = _build_script(account, mailboxes, cutoff_days)
         code, stdout, stderr = self._run_script(script)
         if code != 0:
             raise RuntimeError(stderr.strip() or "osascript returned non-zero exit code")
@@ -87,7 +99,6 @@ def _collect_one(
             account=config.account,
             mailboxes=config.mailboxes,
             cutoff=cutoff,
-            max_messages=max_msgs,
         )
     except (subprocess.SubprocessError, subprocess.TimeoutExpired, RuntimeError, OSError) as exc:
         return SourceResult(
@@ -165,7 +176,7 @@ def _format_messages(
             from_email = msg.get("from_email", "")
             to_emails = msg.get("to_emails", [])
             subject = msg.get("subject", "").strip()
-            body = msg.get("body", "").strip()
+            body = msg.get("body", "").strip().replace("\n", " / ")
             body_part = f" — {body}" if body else ""
             sender = f"**{from_name}** ({from_email})" if from_email else f"**{from_name}**"
             if to_emails:
@@ -182,7 +193,6 @@ def _build_script(
     account: str | None,
     mailboxes: list[str],
     cutoff_days: int,
-    max_messages: int,
 ) -> str:
     account_filter = account.replace('"', '\\"') if account else ""
     if mailboxes:
@@ -196,8 +206,6 @@ tell application "Mail"
     set cutoffDate to (current date) - ({cutoff_days} * days)
     set accountFilter to "{account_filter}"
     set mailboxFilter to {mbox_list}
-    set maxCount to {max_messages}
-    set msgCount to 0
     set output to ""
     set targetAccounts to every account
     repeat with acct in targetAccounts
@@ -208,35 +216,36 @@ tell application "Mail"
                     try
                         set msgs to (messages of mbox whose date received >= cutoffDate)
                         repeat with msg in msgs
-                            if msgCount < maxCount then
-                                set d to date received of msg
-                                set yr to year of d as string
-                                set mo to (month of d as integer)
-                                set dy to day of d
-                                set hr to hours of d
-                                set mn to minutes of d
-                                if mo < 10 then set moS to "0" & mo else set moS to (mo as string)
-                                if dy < 10 then set dyS to "0" & dy else set dyS to (dy as string)
-                                if hr < 10 then set hrS to "0" & hr else set hrS to (hr as string)
-                                if mn < 10 then set mnS to "0" & mn else set mnS to (mn as string)
-                                set dateStr to yr & "-" & moS & "-" & dyS & " " & hrS & ":" & mnS
-                                set rawBody to content of msg
-                                if (count of characters in rawBody) > {_BODY_PREVIEW_CHARS} then
-                                    set rawBody to text 1 through {_BODY_PREVIEW_CHARS} of rawBody
-                                end if
-                                set bodyParas to paragraphs of rawBody
-                                set cleanBody to ""
-                                repeat with para in bodyParas
-                                    set cleanBody to cleanBody & (para as string) & " "
-                                end repeat
-                                set toAddrs to ""
-                                set recips to to recipients of msg
-                                repeat with r in recips
-                                    set toAddrs to toAddrs & (address of r) & ","
-                                end repeat
-                                set output to output & "<<MSG>>" & linefeed & "date: " & dateStr & linefeed & "from: " & (sender of msg) & linefeed & "to: " & toAddrs & linefeed & "subject: " & (subject of msg) & linefeed & "body: " & cleanBody & linefeed
-                                set msgCount to msgCount + 1
+                            set d to date received of msg
+                            set yr to year of d as string
+                            set mo to (month of d as integer)
+                            set dy to day of d
+                            set hr to hours of d
+                            set mn to minutes of d
+                            if mo < 10 then set moS to "0" & mo else set moS to (mo as string)
+                            if dy < 10 then set dyS to "0" & dy else set dyS to (dy as string)
+                            if hr < 10 then set hrS to "0" & hr else set hrS to (hr as string)
+                            if mn < 10 then set mnS to "0" & mn else set mnS to (mn as string)
+                            set dateStr to yr & "-" & moS & "-" & dyS & " " & hrS & ":" & mnS
+                            set rawBody to content of msg
+                            if (count of characters in rawBody) > {_RAW_BODY_FETCH_CHARS} then
+                                set rawBody to text 1 through {_RAW_BODY_FETCH_CHARS} of rawBody
                             end if
+                            set bodyParas to paragraphs of rawBody
+                            set cleanBody to ""
+                            repeat with para in bodyParas
+                                if cleanBody is "" then
+                                    set cleanBody to para as string
+                                else
+                                    set cleanBody to cleanBody & "{_PARAGRAPH_SEPARATOR}" & (para as string)
+                                end if
+                            end repeat
+                            set toAddrs to ""
+                            set recips to to recipients of msg
+                            repeat with r in recips
+                                set toAddrs to toAddrs & (address of r) & ","
+                            end repeat
+                            set output to output & "<<MSG>>" & linefeed & "date: " & dateStr & linefeed & "from: " & (sender of msg) & linefeed & "to: " & toAddrs & linefeed & "subject: " & (subject of msg) & linefeed & "body: " & cleanBody & linefeed
                         end repeat
                     end try
                 end if
@@ -264,6 +273,7 @@ def _parse_output(output: str) -> list[dict]:
         msg["from_name"], msg["from_email"] = _parse_sender(from_raw)
         to_raw = msg.get("to", "")
         msg["to_emails"] = [a.strip().lower() for a in to_raw.split(",") if a.strip()]
+        msg["body"] = _extract_body_preview(msg.get("body", ""))
         messages.append(msg)
     return messages
 
@@ -277,3 +287,41 @@ def _parse_sender(raw: str) -> tuple[str, str]:
         email = match.group(2).strip().lower()
         return name, email
     return "", raw.lower()
+
+
+def _extract_body_preview(raw: str) -> str:
+    """Keep the new content from an email body and trim obvious quoted history."""
+    if not raw:
+        return ""
+    normalized = raw.replace(_PARAGRAPH_SEPARATOR, "\n")
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in normalized.splitlines()]
+    cleaned: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if _is_reply_boundary(stripped):
+            break
+        if stripped.startswith((">", "|")):
+            break
+        if stripped.lower().startswith(_SIGNATURE_MARKERS):
+            break
+        if not stripped:
+            if cleaned and cleaned[-1] != "":
+                cleaned.append("")
+            continue
+        cleaned.append(stripped)
+
+    body = "\n".join(cleaned).strip()
+    if not body:
+        body = normalized.strip()
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    if len(body) > _BODY_PREVIEW_CHARS:
+        body = body[:_BODY_PREVIEW_CHARS].rstrip()
+    return body
+
+
+def _is_reply_boundary(line: str) -> bool:
+    if not line:
+        return False
+    return any(pattern.match(line) for pattern in _REPLY_HEADER_PATTERNS)
