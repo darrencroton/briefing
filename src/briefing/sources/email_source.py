@@ -142,6 +142,7 @@ def _collect_one(
         required=config.required,
         status="ok",
         truncated=truncated,
+        metadata={"empty": not bool(messages)},
     )
 
 

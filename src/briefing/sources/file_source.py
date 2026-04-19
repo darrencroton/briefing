@@ -34,6 +34,5 @@ def collect_file_source(context: SourceContext, config: FileSourceConfig) -> Sou
         required=config.required,
         status="ok",
         truncated=truncated,
-        metadata={"path": str(path)},
+        metadata={"path": str(path), "empty": not bool(limited.strip())},
     )
-

@@ -135,5 +135,5 @@ def collect_notion_source(
         required=config.required,
         status="ok",
         truncated=truncated,
-        metadata={"page_id": config.page_id},
+        metadata={"page_id": config.page_id, "empty": not bool(limited.strip())},
     )

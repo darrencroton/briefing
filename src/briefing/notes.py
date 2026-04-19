@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from .models import MeetingEvent, SeriesConfig
+from .models import MeetingEvent, SeriesConfig, SourceResult
 from .settings import AppSettings
 from .utils import render_template
 
@@ -20,11 +20,12 @@ def render_note(
     event: MeetingEvent,
     series: SeriesConfig,
     summary_bullets: str,
+    source_results: list[SourceResult],
 ) -> str:
     """Render a complete note from tracked template plus deterministic metadata."""
     heading = _build_heading(event)
     frontmatter = _build_frontmatter(event, series, heading)
-    briefing_block = build_briefing_block(summary_bullets)
+    briefing_block = build_briefing_block(summary_bullets, source_results)
     return render_template(
         template_text,
         {
@@ -38,16 +39,44 @@ def render_note(
     )
 
 
-def refresh_note(existing_text: str, summary_bullets: str) -> str:
+def refresh_note(existing_text: str, summary_bullets: str, source_results: list[SourceResult]) -> str:
     """Update only the managed briefing section."""
-    briefing_block = build_briefing_block(summary_bullets)
+    briefing_block = build_briefing_block(summary_bullets, source_results)
     return _replace_section(existing_text, "Briefing", "Meeting Notes", briefing_block + "\n\n---\n")
 
 
-def build_briefing_block(summary_bullets: str) -> str:
+def build_briefing_block(summary_bullets: str, source_results: list[SourceResult]) -> str:
     """Render the generated briefing block for the note template."""
     summary = normalize_summary_bullets(summary_bullets)
-    return f"## Briefing\n\n{summary}"
+    sources_line = build_sources_line(source_results)
+    return f"## Briefing\n\n{summary}\n\n{sources_line}"
+
+
+def build_sources_line(source_results: list[SourceResult]) -> str:
+    """Summarize source usage, empty sources, and source errors for the note footer."""
+    used = _collect_unique_source_names(
+        source_results,
+        predicate=lambda source: source.status == "ok" and not _source_is_empty(source),
+    )
+    empty = _collect_unique_source_names(
+        source_results,
+        predicate=lambda source: source.status == "ok" and _source_is_empty(source),
+        exclude=set(used),
+    )
+    errors = _collect_unique_source_names(
+        source_results,
+        predicate=lambda source: source.status == "error",
+    )
+
+    line = f"**Sources:** {', '.join(used) if used else 'none'}"
+    details: list[str] = []
+    if empty:
+        details.append(f"empty: {', '.join(empty)}")
+    if errors:
+        details.append(f"errors: {', '.join(errors)} - please see logs")
+    if details:
+        line += f" ({'; '.join(details)})"
+    return line
 
 
 def normalize_summary_bullets(summary_bullets: str) -> str:
@@ -84,6 +113,47 @@ def _strip_slack_channel_hashes(text: str) -> str:
         lambda match: f"{match.group(1)}{match.group(2)}",
         text,
     )
+
+
+def _collect_unique_source_names(
+    source_results: list[SourceResult],
+    *,
+    predicate,
+    exclude: set[str] | None = None,
+) -> list[str]:
+    names: list[str] = []
+    excluded = exclude or set()
+    for source in source_results:
+        if not predicate(source):
+            continue
+        name = _display_source_name(source)
+        if name in excluded or name in names:
+            continue
+        names.append(name)
+    return names
+
+
+def _display_source_name(source: SourceResult) -> str:
+    if source.source_type == "previous_note":
+        return "past meeting note"
+    if source.source_type == "slack":
+        return "Slack"
+    if source.source_type == "email":
+        return "Email"
+    if source.source_type == "notion":
+        return source.label or "Notion"
+    if source.source_type == "file":
+        return source.label or "File"
+    return source.label or source.source_type
+
+
+def _source_is_empty(source: SourceResult) -> bool:
+    empty = source.metadata.get("empty")
+    if isinstance(empty, bool):
+        return empty
+    if source.source_type == "previous_note":
+        return not bool(source.metadata.get("path"))
+    return not bool(source.content.strip())
 
 
 def _section_has_user_content(section_text: str) -> bool:

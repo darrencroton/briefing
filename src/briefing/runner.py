@@ -32,6 +32,7 @@ def run_briefing(
     series_configs = load_series_configs(settings)
     env = load_env_file(settings.paths.env_file)
     state_store = StateStore(settings)
+    state_store.prune(now)
     calendar = EventKitClient(settings)
     provider = get_provider(settings)
 
@@ -66,15 +67,16 @@ def run_briefing(
         if diagnostic["status"] == "error":
             exit_code = 1
 
-    state_store.write_run_diagnostic(
-        {
-            "status": "completed" if exit_code == 0 else "error",
-            "now": now.isoformat(),
-            "events_seen": [event.uid for event in events],
-            "results": diagnostics,
-        },
-        now,
-    )
+    if events or exit_code != 0:
+        state_store.write_run_diagnostic(
+            {
+                "status": "completed" if exit_code == 0 else "error",
+                "now": now.isoformat(),
+                "events_seen": [event.uid for event in events],
+                "results": diagnostics,
+            },
+            now,
+        )
     return exit_code
 
 
@@ -121,6 +123,7 @@ def process_event(
     )
     output_path = Path(state.output_path)
     existed_before = output_path.exists()
+    existing_text = output_path.read_text(encoding="utf-8") if existed_before else None
 
     if state.locked:
         logger.info("Skipping %s: occurrence already locked (%s)", event.title, state.lock_reason)
@@ -146,8 +149,8 @@ def process_event(
             "output_path": str(output_path),
         }
 
-    if output_path.exists():
-        locked, reason = note_is_locked(settings, output_path.read_text(encoding="utf-8"))
+    if existing_text is not None:
+        locked, reason = note_is_locked(settings, existing_text)
         if locked:
             state.locked = True
             state.lock_reason = reason
@@ -216,7 +219,21 @@ def process_event(
         _source_hash_key(index, source): sha256_text(source.content)
         for index, source in enumerate(usable_sources)
     }
-    if output_path.exists() and state.summary_hash == summary_hash and state.source_hashes == source_hashes:
+    note_text = render_or_refresh_note(
+        settings=settings,
+        event=event,
+        series=series,
+        output_path=output_path,
+        existing_text=existing_text,
+        summary_bullets=llm_response.text,
+        source_results=sources,
+    )
+    if (
+        existing_text is not None
+        and state.summary_hash == summary_hash
+        and state.source_hashes == source_hashes
+        and existing_text == note_text
+    ):
         state.last_status = "unchanged"
         state.last_generated_at = now.isoformat()
         state_store.save_occurrence(state)
@@ -228,13 +245,6 @@ def process_event(
             "output_path": str(output_path),
         }
 
-    note_text = render_or_refresh_note(
-        settings=settings,
-        event=event,
-        series=series,
-        output_path=output_path,
-        summary_bullets=llm_response.text,
-    )
     if not dry_run:
         output_path.write_text(note_text, encoding="utf-8")
 
@@ -268,14 +278,15 @@ def render_or_refresh_note(
     event: MeetingEvent,
     series: SeriesConfig,
     output_path: Path,
+    existing_text: str | None,
     summary_bullets: str,
+    source_results: list[SourceResult],
 ) -> str:
     """Create or refresh a note in managed mode."""
     template = (settings.paths.template_dir / settings.llm.note_template).read_text(encoding="utf-8")
-    if output_path.exists():
-        existing = output_path.read_text(encoding="utf-8")
-        return refresh_note(existing, summary_bullets)
-    return render_note(settings, template, event, series, summary_bullets)
+    if existing_text is not None:
+        return refresh_note(existing_text, summary_bullets, source_results)
+    return render_note(settings, template, event, series, summary_bullets, source_results)
 
 
 def build_output_filename(event: MeetingEvent, series: SeriesConfig) -> str:

@@ -282,7 +282,10 @@ def collect_slack_sources(
                     required=config.required,
                     status="ok",
                     truncated=truncated,
-                    metadata={"channel_ref": channel_ref},
+                    metadata={
+                        "channel_ref": channel_ref,
+                        "empty": not _slack_digest_has_messages(limited),
+                    },
                 )
             )
         except (requests.RequestException, RuntimeError) as exc:
@@ -310,7 +313,10 @@ def collect_slack_sources(
                     required=config.required,
                     status="ok",
                     truncated=truncated,
-                    metadata={"dm_conversation_id": conversation_id},
+                    metadata={
+                        "dm_conversation_id": conversation_id,
+                        "empty": not _slack_digest_has_messages(limited),
+                    },
                 )
             )
         except (requests.RequestException, RuntimeError) as exc:
@@ -341,3 +347,8 @@ def _format_reactions(reactions: Iterable[dict]) -> str:
         else:
             parts.append(f":{name}:")
     return f"  {' '.join(parts)}" if parts else ""
+
+
+def _slack_digest_has_messages(content: str) -> bool:
+    """Detect whether a formatted Slack digest includes any message lines."""
+    return any(line.lstrip().startswith("- **") for line in content.splitlines())

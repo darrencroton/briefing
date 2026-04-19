@@ -193,7 +193,7 @@ user_config/settings.toml local mutable config (git-ignored)
 user_config/series/       local series config (git-ignored)
 scripts/setup.sh          first-run bootstrap
 scripts/launchd/          LaunchAgent helpers
-state/                    runtime state and diagnostics
+state/                    runtime state and diagnostics (older entries are pruned automatically)
 logs/                     runtime logs
 archive/                  untracked retained local material
 ```

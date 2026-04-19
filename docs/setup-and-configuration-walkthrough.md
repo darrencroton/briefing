@@ -194,7 +194,7 @@ When it writes a file, the generated YAML includes:
 - `vault_root`: root folder of your notes workspace
 - `meeting_notes_dir`: folder inside `vault_root` where notes are written
 - `log_dir`: local logs directory
-- `state_dir`: local runtime state and diagnostics directory
+- `state_dir`: local runtime state and diagnostics directory; old run diagnostics and stale occurrence state are pruned automatically
 - `prompt_dir`: tracked prompt template directory
 - `template_dir`: tracked note template directory
 - `series_dir`: local series YAML directory

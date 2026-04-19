@@ -11,7 +11,7 @@ env_file = "~/.env.briefing"
 
 [calendar]
 include_all_day = false
-window_min_minutes = 15
+window_min_minutes = 10
 window_max_minutes = 45
 # Calendar names can be a single quoted string or a list of quoted strings.
 include_calendar_names = []

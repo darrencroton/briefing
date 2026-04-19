@@ -18,7 +18,7 @@ def collect_previous_note(context: SourceContext) -> SourceResult:
             content="No previous meeting note was found for this series.",
             required=False,
             status="ok",
-            metadata={},
+            metadata={"empty": True},
         )
     content, truncated = shorten_text(
         summarize_previous_note(path),
@@ -31,6 +31,5 @@ def collect_previous_note(context: SourceContext) -> SourceResult:
         required=False,
         status="ok",
         truncated=truncated,
-        metadata={"path": str(path)},
+        metadata={"path": str(path), "empty": False},
     )
-
