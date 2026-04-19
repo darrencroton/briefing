@@ -8,7 +8,7 @@ Use the email source when relevant meeting context lives in:
 - emails in a dedicated mailbox or project folder
 - threads matching a recurring subject keyword
 
-`briefing` reads recent message history from Apple Mail and turns it into a digest for the LLM. It does not send or modify any email.
+`briefing` reads recent message history from Apple Mail and turns it into a digest for the LLM. It works back from the most recent matched emails, strips obvious quoted reply-chain noise, keeps a cleaned excerpt per message, and caps the final email block before it is sent to the LLM so the context stays within budget. It does not send or modify any email.
 
 ## Quickstart
 
