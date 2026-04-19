@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import subprocess
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 import pytest
 
@@ -47,6 +46,7 @@ _RAW_OUTPUT = (
     "<<MSG>>\n"
     "date: 2026-04-16 09:14\n"
     "from: Ben Smith <ben@example.com>\n"
+    "to: darren@example.com,\n"
     "subject: Re: Q2 Planning\n"
     "body: Sounds good let's align Thursday\n"
     "<<MSG>>"
@@ -136,6 +136,7 @@ def test_mail_adapter_fetch_messages_parses_output(
     assert msgs[0]["from_email"] == "ben@example.com"
     assert msgs[0]["from_name"] == "Ben Smith"
     assert msgs[0]["date"] == "2026-04-16 09:14"
+    assert "darren@example.com" in msgs[0]["to_emails"]
 
 
 def test_mail_adapter_fetch_messages_returns_empty_list_on_no_output(
@@ -184,6 +185,7 @@ def test_collect_email_sources_formats_output_grouped_by_date(
             "subject": "Hello",
             "from_name": "Ben",
             "from_email": "ben@example.com",
+            "to_emails": [],
             "date": "2026-04-16 09:14",
             "body": "Hi there",
         }
@@ -202,15 +204,15 @@ def test_collect_email_sources_formats_output_grouped_by_date(
     assert "Thursday" in result.content  # date heading
 
 
-def test_collect_email_sources_filters_by_sender_email(
+def test_collect_email_sources_filters_by_from_email(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails", sender_emails_any=["alice@example.com"])
+    config = EmailSourceConfig(label="Emails", email_addresses=["alice@example.com"])
     msgs = [
-        {"subject": "From Alice", "from_name": "Alice", "from_email": "alice@example.com", "date": "2026-04-16 09:00", "body": "Hi"},
-        {"subject": "From Bob", "from_name": "Bob", "from_email": "bob@example.com", "date": "2026-04-16 10:00", "body": "Hey"},
+        {"subject": "From Alice", "from_name": "Alice", "from_email": "alice@example.com", "to_emails": [], "date": "2026-04-16 09:00", "body": "Hi"},
+        {"subject": "From Bob", "from_name": "Bob", "from_email": "bob@example.com", "to_emails": [], "date": "2026-04-16 10:00", "body": "Hey"},
     ]
     monkeypatch.setattr(
         "briefing.sources.email_source.MailAdapter.fetch_messages",
@@ -221,6 +223,31 @@ def test_collect_email_sources_filters_by_sender_email(
     assert "From Bob" not in results[0].content
 
 
+def test_collect_email_sources_filters_by_to_email(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    series_config,
+) -> None:
+    """Sent email (from self to Ben) is included when Ben's address is configured."""
+    config = EmailSourceConfig(label="Emails", email_addresses=["ben@example.com"])
+    msgs = [
+        # Received from Ben
+        {"subject": "From Ben", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": ["darren@example.com"], "date": "2026-04-15 10:00", "body": "Here's the report"},
+        # Sent to Ben (from self) — currently no reply
+        {"subject": "Report request", "from_name": "Darren", "from_email": "darren@example.com", "to_emails": ["ben@example.com"], "date": "2026-04-16 09:00", "body": "Can you send the report?"},
+        # Unrelated — neither from nor to Ben
+        {"subject": "Unrelated", "from_name": "Alice", "from_email": "alice@example.com", "to_emails": ["darren@example.com"], "date": "2026-04-16 10:00", "body": "Other"},
+    ]
+    monkeypatch.setattr(
+        "briefing.sources.email_source.MailAdapter.fetch_messages",
+        lambda *_args, **_kwargs: msgs,
+    )
+    results = collect_email_sources(_make_context(app_settings, series_config), [config])
+    assert "From Ben" in results[0].content
+    assert "Report request" in results[0].content   # sent email caught via to_emails
+    assert "Unrelated" not in results[0].content
+
+
 def test_collect_email_sources_filters_by_subject_regex(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,
@@ -228,8 +255,8 @@ def test_collect_email_sources_filters_by_subject_regex(
 ) -> None:
     config = EmailSourceConfig(label="Emails", subject_regex_any=["planning"])
     msgs = [
-        {"subject": "Q2 Planning", "from_name": "Ben", "from_email": "ben@example.com", "date": "2026-04-16 09:00", "body": "..."},
-        {"subject": "Team lunch", "from_name": "Ben", "from_email": "ben@example.com", "date": "2026-04-16 10:00", "body": "..."},
+        {"subject": "Q2 Planning", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 09:00", "body": "..."},
+        {"subject": "Team lunch", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 10:00", "body": "..."},
     ]
     monkeypatch.setattr(
         "briefing.sources.email_source.MailAdapter.fetch_messages",
@@ -281,8 +308,8 @@ def test_collect_email_sources_returns_one_result_per_config(
     series_config,
 ) -> None:
     configs = [
-        EmailSourceConfig(label="Emails from Ben", sender_emails_any=["ben@example.com"]),
-        EmailSourceConfig(label="Emails from Alice", sender_emails_any=["alice@example.com"]),
+        EmailSourceConfig(label="Emails from Ben", email_addresses=["ben@example.com"]),
+        EmailSourceConfig(label="Emails from Alice", email_addresses=["alice@example.com"]),
     ]
     monkeypatch.setattr(
         "briefing.sources.email_source.MailAdapter.fetch_messages",
@@ -303,16 +330,23 @@ def test_format_messages_returns_empty_string_for_no_messages() -> None:
 
 
 def test_format_messages_includes_label_and_scope() -> None:
-    msgs = [{"subject": "Hi", "from_name": "Ben", "from_email": "ben@example.com", "date": "2026-04-16 09:00", "body": ""}]
+    msgs = [{"subject": "Hi", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 09:00", "body": ""}]
     out = _format_messages(msgs, "My Emails", 7, ["INBOX"])
     assert "# My Emails" in out
     assert "INBOX" in out
 
 
+def test_format_messages_shows_to_address_for_sent_emails() -> None:
+    msgs = [{"subject": "Hi", "from_name": "Darren", "from_email": "darren@example.com", "to_emails": ["ben@example.com"], "date": "2026-04-16 09:00", "body": ""}]
+    out = _format_messages(msgs, "Label", 7, [])
+    assert "ben@example.com" in out
+    assert "→" in out
+
+
 def test_format_messages_groups_by_date_descending() -> None:
     msgs = [
-        {"subject": "Earlier", "from_name": "A", "from_email": "a@x.com", "date": "2026-04-14 09:00", "body": ""},
-        {"subject": "Later", "from_name": "B", "from_email": "b@x.com", "date": "2026-04-16 10:00", "body": ""},
+        {"subject": "Earlier", "from_name": "A", "from_email": "a@x.com", "to_emails": [], "date": "2026-04-14 09:00", "body": ""},
+        {"subject": "Later", "from_name": "B", "from_email": "b@x.com", "to_emails": [], "date": "2026-04-16 10:00", "body": ""},
     ]
     out = _format_messages(msgs, "Label", 7, [])
     assert out.index("Later") < out.index("Earlier")

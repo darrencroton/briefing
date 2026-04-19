@@ -98,10 +98,14 @@ def _collect_one(
             error=str(exc),
         )
 
-    # Apply sender filter (Python-side; Apple Mail's sender field is not email-only)
-    if config.sender_emails_any:
-        sender_set = {e.lower() for e in config.sender_emails_any}
-        messages = [m for m in messages if m.get("from_email", "").lower() in sender_set]
+    # Filter by email address — match against from_email or any to_email (OR logic)
+    if config.email_addresses:
+        addr_set = {e.lower() for e in config.email_addresses}
+        messages = [
+            m for m in messages
+            if m.get("from_email", "").lower() in addr_set
+            or addr_set.intersection(e.lower() for e in m.get("to_emails", []))
+        ]
 
     # Apply subject regex filter (OR logic, case-insensitive)
     if config.subject_regex_any:
@@ -156,13 +160,18 @@ def _format_messages(
         lines.append("")
         for msg in by_date[date_str]:
             time_str = msg.get("date", "")[11:16]
-            name = msg.get("from_name") or msg.get("from_email", "")
-            email = msg.get("from_email", "")
+            from_name = msg.get("from_name") or msg.get("from_email", "")
+            from_email = msg.get("from_email", "")
+            to_emails = msg.get("to_emails", [])
             subject = msg.get("subject", "").strip()
             body = msg.get("body", "").strip()
             body_part = f" — {body}" if body else ""
-            sender = f"**{name}** ({email})" if email else f"**{name}**"
-            lines.append(f"- {sender} {time_str}: {subject}{body_part}")
+            sender = f"**{from_name}** ({from_email})" if from_email else f"**{from_name}**"
+            if to_emails:
+                to_part = f" → {', '.join(to_emails)}"
+            else:
+                to_part = ""
+            lines.append(f"- {sender}{to_part} {time_str}: {subject}{body_part}")
         lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -219,7 +228,12 @@ tell application "Mail"
                                 repeat with para in bodyParas
                                     set cleanBody to cleanBody & (para as string) & " "
                                 end repeat
-                                set output to output & "<<MSG>>" & linefeed & "date: " & dateStr & linefeed & "from: " & (sender of msg) & linefeed & "subject: " & (subject of msg) & linefeed & "body: " & cleanBody & linefeed
+                                set toAddrs to ""
+                                set recips to to recipients of msg
+                                repeat with r in recips
+                                    set toAddrs to toAddrs & (address of r) & ","
+                                end repeat
+                                set output to output & "<<MSG>>" & linefeed & "date: " & dateStr & linefeed & "from: " & (sender of msg) & linefeed & "to: " & toAddrs & linefeed & "subject: " & (subject of msg) & linefeed & "body: " & cleanBody & linefeed
                                 set msgCount to msgCount + 1
                             end if
                         end repeat
@@ -247,6 +261,8 @@ def _parse_output(output: str) -> list[dict]:
             continue
         from_raw = msg.get("from", "")
         msg["from_name"], msg["from_email"] = _parse_sender(from_raw)
+        to_raw = msg.get("to", "")
+        msg["to_emails"] = [a.strip().lower() for a in to_raw.split(",") if a.strip()]
         messages.append(msg)
     return messages
 

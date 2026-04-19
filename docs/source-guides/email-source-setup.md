@@ -72,18 +72,20 @@ Before editing configuration, decide the filtering approach for the series.
 
 The email source supports three independent filters that can be combined:
 
-### Filter by sender address
+### Filter by email address
 
-Best when the meeting involves a specific person and their recent emails are relevant.
+Best when the meeting involves a specific person and any email exchanged with them is relevant — whether you sent it or they did.
 
 ```yaml
-sender_emails_any: [ben@example.com]
+email_addresses: [ben@example.com]
 ```
 
-You can list multiple addresses. `briefing` keeps emails where the sender matches any of them (OR logic).
+`briefing` keeps any email where the configured address appears in either the `From` or `To` field. This means outgoing emails (e.g. a report request you sent that has not yet been replied to) are captured alongside incoming ones.
+
+You can list multiple addresses. `briefing` keeps emails where any of the configured addresses appear in `From` or `To` (OR logic).
 
 ```yaml
-sender_emails_any: [ben@example.com, alice@example.com]
+email_addresses: [ben@example.com, alice@example.com]
 ```
 
 ### Filter by mailbox
@@ -134,13 +136,13 @@ history_days: 14
 
 Open the relevant file under `user_config/series/` and add an `email` block inside `sources`.
 
-Minimal example — filter by sender only:
+Minimal example — filter by email address (matches both sent and received):
 
 ```yaml
 sources:
   email:
     - label: Emails from Ben
-      sender_emails_any: [ben@example.com]
+      email_addresses: [ben@example.com]
       history_days: 7
       required: false
 ```
@@ -165,7 +167,7 @@ sources:
     - label: Emails from Ben
       account: iCloud
       mailboxes: [INBOX]
-      sender_emails_any: [ben@example.com]
+      email_addresses: [ben@example.com]
       subject_regex_any: []
       history_days: 7
       max_messages: 20
@@ -179,7 +181,7 @@ You can configure multiple email sources per series by adding more list items:
 sources:
   email:
     - label: Emails from Ben
-      sender_emails_any: [ben@example.com]
+      email_addresses: [ben@example.com]
       history_days: 7
       required: false
     - label: Project Alpha folder
@@ -193,7 +195,7 @@ Available fields:
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `label` | yes | — | Used in the LLM prompt and run output |
-| `sender_emails_any` | no | `[]` | Email addresses to match; OR logic |
+| `email_addresses` | no | `[]` | Email addresses to match; OR logic |
 | `account` | no | all accounts | Apple Mail account name |
 | `mailboxes` | no | all mailboxes | Mailbox names to search; OR logic |
 | `subject_regex_any` | no | `[]` | Case-insensitive Python regex patterns; OR logic |
@@ -228,7 +230,7 @@ For the email source, this confirms that:
 
 It does not confirm:
 
-- that every sender address you configured is correct
+- that every address in `email_addresses` is correct
 - that the mailbox names exist in Apple Mail
 - that the lookback window will return any messages
 
@@ -254,7 +256,7 @@ If the note is missing expected email content, review the runtime logs in `logs/
 
 If you are unsure how to configure email for a series, start with this:
 
-1. one sender address only
+1. one address in `email_addresses`
 2. no mailbox filter (search everywhere)
 3. `required: false`
 4. default `history_days`
@@ -282,11 +284,11 @@ Usually one of:
 
 ### The note has too much email content
 
-Reduce `history_days`, tighten `sender_emails_any` to fewer addresses, add a `subject_regex_any` filter, or lower `max_characters` for that series.
+Reduce `history_days`, tighten `email_addresses` to fewer addresses, add a `subject_regex_any` filter, or lower `max_characters` for that series.
 
 ### Emails appear in the briefing from unexpected senders
 
-You have not set a `sender_emails_any` filter. Add one to restrict to the relevant person.
+You have not set a `email_addresses` filter. Add one to restrict to the relevant person.
 
 ### The email source fails under launchd but works interactively
 

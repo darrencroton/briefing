@@ -82,7 +82,7 @@ class EmailSourceConfig:
     """Apple Mail email source configuration."""
 
     label: str
-    sender_emails_any: list[str] = field(default_factory=list)
+    email_addresses: list[str] = field(default_factory=list)
     account: str | None = None
     mailboxes: list[str] = field(default_factory=list)
     subject_regex_any: list[str] = field(default_factory=list)
