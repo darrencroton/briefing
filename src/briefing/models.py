@@ -81,7 +81,6 @@ class FileSourceConfig:
 class EmailSourceConfig:
     """Apple Mail email source configuration."""
 
-    label: str
     email_addresses: list[str] = field(default_factory=list)
     account: str | None = None
     mailboxes: list[str] = field(default_factory=list)

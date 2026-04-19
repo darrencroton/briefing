@@ -136,13 +136,14 @@ history_days: 14
 
 Open the relevant file under `user_config/series/` and add an `email` block inside `sources`.
 
+The source label in the LLM prompt is derived automatically as "Emails related to `<series display_name>`".
+
 Minimal example — filter by email address (matches both sent and received):
 
 ```yaml
 sources:
   email:
-    - label: Emails from Ben
-      email_addresses: [ben@example.com]
+    - email_addresses: [ben@example.com]
       history_days: 7
       required: false
 ```
@@ -152,8 +153,7 @@ Example with mailbox and subject filter combined:
 ```yaml
 sources:
   email:
-    - label: Project Alpha emails
-      mailboxes: [Project Alpha]
+    - mailboxes: [Project Alpha]
       subject_regex_any: [alpha, project kickoff]
       history_days: 14
       required: false
@@ -164,8 +164,7 @@ Example with all filter fields for a 1:1 meeting:
 ```yaml
 sources:
   email:
-    - label: Emails from Ben
-      account: iCloud
+    - account: iCloud
       mailboxes: [INBOX]
       email_addresses: [ben@example.com]
       subject_regex_any: []
@@ -180,12 +179,10 @@ You can configure multiple email sources per series by adding more list items:
 ```yaml
 sources:
   email:
-    - label: Emails from Ben
-      email_addresses: [ben@example.com]
+    - email_addresses: [ben@example.com]
       history_days: 7
       required: false
-    - label: Project Alpha folder
-      mailboxes: [Project Alpha]
+    - mailboxes: [Project Alpha]
       history_days: 14
       required: false
 ```
@@ -194,7 +191,6 @@ Available fields:
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
-| `label` | yes | — | Used in the LLM prompt and run output |
 | `email_addresses` | no | `[]` | Email addresses to match; OR logic |
 | `account` | no | all accounts | Apple Mail account name |
 | `mailboxes` | no | all mailboxes | Mailbox names to search; OR logic |

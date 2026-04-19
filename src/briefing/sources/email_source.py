@@ -80,6 +80,7 @@ def _collect_one(
     max_msgs = config.max_messages or context.settings.email.max_messages
     max_chars = config.max_characters or context.settings.email.max_characters
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    label = f"Emails related to {context.series.display_name}"
 
     try:
         messages = adapter.fetch_messages(
@@ -91,7 +92,7 @@ def _collect_one(
     except (subprocess.SubprocessError, subprocess.TimeoutExpired, RuntimeError, OSError) as exc:
         return SourceResult(
             source_type="email",
-            label=config.label,
+            label=label,
             content="",
             required=config.required,
             status="error",
@@ -118,12 +119,12 @@ def _collect_one(
     messages.sort(key=lambda m: m.get("date", ""), reverse=True)
     messages = messages[:max_msgs]
 
-    content = _format_messages(messages, config.label, days, config.mailboxes)
+    content = _format_messages(messages, label, days, config.mailboxes)
     limited, truncated = shorten_text(content, max_chars)
 
     return SourceResult(
         source_type="email",
-        label=config.label,
+        label=label,
         content=limited,
         required=config.required,
         status="ok",

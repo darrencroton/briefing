@@ -179,7 +179,7 @@ def test_collect_email_sources_formats_output_grouped_by_date(
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails from Ben")
+    config = EmailSourceConfig()
     msgs = [
         {
             "subject": "Hello",
@@ -199,6 +199,7 @@ def test_collect_email_sources_formats_output_grouped_by_date(
     result = results[0]
     assert result.status == "ok"
     assert result.source_type == "email"
+    assert result.label == "Emails related to CAS Strategy Meeting"
     assert "Ben" in result.content
     assert "Hello" in result.content
     assert "Thursday" in result.content  # date heading
@@ -209,7 +210,7 @@ def test_collect_email_sources_filters_by_from_email(
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails", email_addresses=["alice@example.com"])
+    config = EmailSourceConfig(email_addresses=["alice@example.com"])
     msgs = [
         {"subject": "From Alice", "from_name": "Alice", "from_email": "alice@example.com", "to_emails": [], "date": "2026-04-16 09:00", "body": "Hi"},
         {"subject": "From Bob", "from_name": "Bob", "from_email": "bob@example.com", "to_emails": [], "date": "2026-04-16 10:00", "body": "Hey"},
@@ -229,7 +230,7 @@ def test_collect_email_sources_filters_by_to_email(
     series_config,
 ) -> None:
     """Sent email (from self to Ben) is included when Ben's address is configured."""
-    config = EmailSourceConfig(label="Emails", email_addresses=["ben@example.com"])
+    config = EmailSourceConfig(email_addresses=["ben@example.com"])
     msgs = [
         # Received from Ben
         {"subject": "From Ben", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": ["darren@example.com"], "date": "2026-04-15 10:00", "body": "Here's the report"},
@@ -253,7 +254,7 @@ def test_collect_email_sources_filters_by_subject_regex(
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails", subject_regex_any=["planning"])
+    config = EmailSourceConfig(subject_regex_any=["planning"])
     msgs = [
         {"subject": "Q2 Planning", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 09:00", "body": "..."},
         {"subject": "Team lunch", "from_name": "Ben", "from_email": "ben@example.com", "to_emails": [], "date": "2026-04-16 10:00", "body": "..."},
@@ -272,7 +273,7 @@ def test_collect_email_sources_returns_error_result_on_adapter_exception(
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails", required=False)
+    config = EmailSourceConfig(required=False)
 
     def fail(*_args, **_kwargs):
         raise RuntimeError("permission denied")
@@ -292,7 +293,7 @@ def test_collect_email_sources_empty_mailbox_returns_ok_with_empty_content(
     app_settings,
     series_config,
 ) -> None:
-    config = EmailSourceConfig(label="Emails")
+    config = EmailSourceConfig()
     monkeypatch.setattr(
         "briefing.sources.email_source.MailAdapter.fetch_messages",
         lambda *_args, **_kwargs: [],
@@ -308,8 +309,8 @@ def test_collect_email_sources_returns_one_result_per_config(
     series_config,
 ) -> None:
     configs = [
-        EmailSourceConfig(label="Emails from Ben", email_addresses=["ben@example.com"]),
-        EmailSourceConfig(label="Emails from Alice", email_addresses=["alice@example.com"]),
+        EmailSourceConfig(email_addresses=["ben@example.com"]),
+        EmailSourceConfig(email_addresses=["alice@example.com"]),
     ]
     monkeypatch.setattr(
         "briefing.sources.email_source.MailAdapter.fetch_messages",
@@ -317,8 +318,7 @@ def test_collect_email_sources_returns_one_result_per_config(
     )
     results = collect_email_sources(_make_context(app_settings, series_config), configs)
     assert len(results) == 2
-    assert results[0].label == "Emails from Ben"
-    assert results[1].label == "Emails from Alice"
+    assert all(r.label == "Emails related to CAS Strategy Meeting" for r in results)
 
 
 # ---------------------------------------------------------------------------

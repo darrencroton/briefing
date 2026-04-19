@@ -250,7 +250,6 @@ def load_series_configs(settings: AppSettings) -> list[SeriesConfig]:
                     ],
                     emails=[
                         EmailSourceConfig(
-                            label=str(item["label"]),
                             email_addresses=[str(e) for e in item.get("email_addresses", [])],
                             account=item.get("account") or None,
                             mailboxes=[str(m) for m in item.get("mailboxes", [])],
