@@ -82,3 +82,9 @@ That means source-level mistakes such as a wrong Slack channel, wrong Slack user
 3. Run `uv run briefing validate`.
 4. Run `uv run briefing run` close to a real meeting in that series.
 5. Inspect the note output before adding more sources.
+
+
+## Proposed Sources (Design Notes)
+
+- [`email-source-discovery.md`](email-source-discovery.md)
+  Product/design options for a future Apple Mail-backed `email` source.
