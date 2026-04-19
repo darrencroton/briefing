@@ -19,6 +19,8 @@ Use them after the main install is already working:
   Add one or more standing Notion pages to a meeting series.
 - [`file-source-setup.md`](file-source-setup.md)
   Add local or synced text files to a meeting series.
+- [`email-source-setup.md`](email-source-setup.md)
+  Add Apple Mail messages to a meeting series, filtered by sender, mailbox, or subject.
 - [`previous-note-source.md`](previous-note-source.md)
   Understand the built-in previous-note source and how to make it useful.
 
@@ -34,6 +36,8 @@ Use the smallest set of sources that gives you reliable meeting context.
   Best when a recurring meeting revolves around one or two standing pages.
 - `file`
   Best when the relevant context already exists as stable Markdown or text files on disk.
+- `email`
+  Best for 1:1 meetings where recent email threads with that person are the primary context.
 
 For many users, the best first working setup is:
 
@@ -71,6 +75,7 @@ Why this matters:
 - Slack: token present and token can authenticate.
 - Notion: token present and token can authenticate.
 - Files: every configured file path exists.
+- Email: macOS Automation permission for Apple Mail is granted.
 - Previous note: nothing to configure, so there is nothing explicit to validate.
 
 That means source-level mistakes such as a wrong Slack channel, wrong Slack user ID, or a Notion page that was never shared with the integration may only show up when `uv run briefing run` tries to collect real source data.
