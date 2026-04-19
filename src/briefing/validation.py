@@ -84,6 +84,13 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
             ok, message = client.validate()
             messages.append(ValidationMessage("info" if ok else "error", "notion", message))
 
+    email_needed = any(config.sources.emails for config in series_configs)
+    if email_needed:
+        from .sources.email_source import MailAdapter
+        adapter = MailAdapter(timeout=settings.email.request_timeout_seconds)
+        ok, message = adapter.validate()
+        messages.append(ValidationMessage("info" if ok else "error", "email", message))
+
     for config in series_configs:
         for file_source in config.sources.files:
             path = expand_path(file_source.path, settings.repo_root)

@@ -9,6 +9,7 @@ from briefing.models import MatchRules, SeriesConfig, SeriesSources
 from briefing.settings import (
     AppSettings,
     CalendarSettings,
+    EmailSettings,
     ExecutionSettings,
     FilesSettings,
     LLMSettings,
@@ -91,6 +92,12 @@ def app_settings(tmp_path: Path) -> AppSettings:
             max_characters=20000,
         ),
         files=FilesSettings(max_characters=20000),
+        email=EmailSettings(
+            history_days=7,
+            max_messages=20,
+            max_characters=10000,
+            request_timeout_seconds=5,
+        ),
         logging=LoggingSettings(
             level="INFO",
             history_file="history.log",

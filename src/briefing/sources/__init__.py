@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 
+from .email_source import collect_email_sources
 from .file_source import collect_file_source
 from .notion_source import collect_notion_source
 from .previous_note import collect_previous_note
@@ -61,6 +62,12 @@ def collect_sources(
 
     for file_config in series.sources.files:
         jobs.append((order, lambda cfg=file_config: [collect_file_source(context, cfg)]))
+        order += 1
+
+    if series.sources.emails:
+        jobs.append(
+            (order, lambda cfgs=series.sources.emails: collect_email_sources(context, cfgs))
+        )
         order += 1
 
     results_by_order: list[tuple[int, list[SourceResult]]] = []

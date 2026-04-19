@@ -111,6 +111,7 @@ def _init_series(settings, event_uid: str | None, index: int | None, force: bool
             "slack": {"channel_refs": [], "dm_conversation_ids": [], "required": False},
             "notion": [],
             "files": [],
+            "email": [],
         },
     }
     ensure_directory(settings.paths.series_dir)

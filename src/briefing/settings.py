@@ -13,6 +13,7 @@ import yaml
 
 from .bootstrap import default_settings_path, local_settings_path
 from .models import (
+    EmailSourceConfig,
     FileSourceConfig,
     MatchRules,
     NotionSourceConfig,
@@ -97,6 +98,14 @@ class FilesSettings:
 
 
 @dataclass(slots=True)
+class EmailSettings:
+    history_days: int
+    max_messages: int
+    max_characters: int
+    request_timeout_seconds: int
+
+
+@dataclass(slots=True)
 class LoggingSettings:
     level: str
     history_file: str
@@ -116,6 +125,7 @@ class AppSettings:
     slack: SlackSettings
     notion: NotionSettings
     files: FilesSettings
+    email: EmailSettings
     logging: LoggingSettings
 
 
@@ -177,6 +187,7 @@ def load_settings(repo_root: Path | None = None) -> AppSettings:
             slack=SlackSettings(**data["slack"]),
             notion=NotionSettings(**data["notion"]),
             files=FilesSettings(**data["files"]),
+            email=EmailSettings(**data["email"]),
             logging=LoggingSettings(**data["logging"]),
         )
     except KeyError as exc:
@@ -236,6 +247,20 @@ def load_series_configs(settings: AppSettings) -> list[SeriesConfig]:
                             max_characters=_optional_int(item.get("max_characters")),
                         )
                         for item in sources_raw.get("files", [])
+                    ],
+                    emails=[
+                        EmailSourceConfig(
+                            label=str(item["label"]),
+                            sender_emails_any=[str(e) for e in item.get("sender_emails_any", [])],
+                            account=item.get("account") or None,
+                            mailboxes=[str(m) for m in item.get("mailboxes", [])],
+                            subject_regex_any=[str(r) for r in item.get("subject_regex_any", [])],
+                            history_days=_optional_int(item.get("history_days")),
+                            max_messages=_optional_int(item.get("max_messages")),
+                            max_characters=_optional_int(item.get("max_characters")),
+                            required=bool(item.get("required", False)),
+                        )
+                        for item in sources_raw.get("email", [])
                     ],
                 ),
                 overrides=dict(raw.get("overrides") or {}),

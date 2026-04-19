@@ -78,12 +78,28 @@ class FileSourceConfig:
 
 
 @dataclass(slots=True)
+class EmailSourceConfig:
+    """Apple Mail email source configuration."""
+
+    label: str
+    sender_emails_any: list[str] = field(default_factory=list)
+    account: str | None = None
+    mailboxes: list[str] = field(default_factory=list)
+    subject_regex_any: list[str] = field(default_factory=list)
+    history_days: int | None = None
+    max_messages: int | None = None
+    max_characters: int | None = None
+    required: bool = False
+
+
+@dataclass(slots=True)
 class SeriesSources:
     """Configured sources for a meeting series."""
 
     slack: SlackSourceConfig | None = None
     notion: list[NotionSourceConfig] = field(default_factory=list)
     files: list[FileSourceConfig] = field(default_factory=list)
+    emails: list[EmailSourceConfig] = field(default_factory=list)
 
 
 @dataclass(slots=True)
