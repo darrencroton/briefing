@@ -3,10 +3,21 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+import sys
 
 from .settings import AppSettings
 from .utils import ensure_directory
+
+
+class _BelowLevelFilter(logging.Filter):
+    """Allow records below a specific severity."""
+
+    def __init__(self, upper_bound: int) -> None:
+        super().__init__()
+        self.upper_bound = upper_bound
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno < self.upper_bound
 
 
 def configure_logging(settings: AppSettings) -> None:
@@ -21,9 +32,15 @@ def configure_logging(settings: AppSettings) -> None:
 
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    root.addHandler(console)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.addFilter(_BelowLevelFilter(logging.ERROR))
+    root.addHandler(stdout_handler)
+
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setLevel(logging.ERROR)
+    stderr_handler.setFormatter(formatter)
+    root.addHandler(stderr_handler)
 
     last_run_handler = logging.FileHandler(last_run_path, mode="w", encoding="utf-8")
     last_run_handler.setFormatter(formatter)
@@ -34,4 +51,3 @@ def configure_logging(settings: AppSettings) -> None:
     root.addHandler(history_handler)
 
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-
