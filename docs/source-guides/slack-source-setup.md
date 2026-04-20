@@ -121,11 +121,11 @@ Why `briefing` needs them:
 
 If you only need channels, you can skip the DM scopes. If you only need one-to-one DMs, you can skip the `mpim:*` scopes. If you only need group DMs, you can skip the `im:*` scopes.
 
-If you add or change scopes after installing the app, return to `OAuth & Permissions` and run `Install to Workspace` again so Slack issues an updated installed token.
+If you add or change scopes after installing the app, return to `OAuth & Permissions` and run `Install to Workspace` again in the webpage so Slack sends you through the approval flow again and updates the installed token. This is a reauthorization step in Slack's API webpage app settings, not deleting the app or re-downloading anything on your Mac.
 
 Slack's official guide for this page is here: [Using OAuth scopes](https://docs.slack.dev/authentication/installing-with-oauth#using-oauth-scopes).
 
-## 4. Install The App And Copy The User OAuth Token
+## 4. Install Or Reauthorize The App And Copy The User OAuth Token
 
 Stay on the same `OAuth & Permissions` page.
 
@@ -138,6 +138,8 @@ Then:
 5. Copy the installed `User OAuth Token`.
 
 That installed user token is the value `briefing` needs.
+
+If Slack shows a `Reinstall to Workspace` link after you change scopes, use that. In practice this means reauthorizing the app in Slack so the token grant picks up the new scopes.
 
 Do not copy any of these instead:
 
