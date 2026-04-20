@@ -18,6 +18,13 @@ class CalendarError(RuntimeError):
     """Raised when EventKit access fails."""
 
 
+def _python_str(value) -> str | None:
+    """Convert Objective-C string-like values into plain Python strings."""
+    if value is None:
+        return None
+    return str(value)
+
+
 def _get_event_store():
     """Create and return an EKEventStore instance.
 
@@ -88,8 +95,8 @@ def _ekevent_to_meeting(event) -> MeetingEvent | None:
     # eventIdentifier() is Apple's recommended persistent identifier for
     # events.  calendarItemExternalIdentifier (the iCalendar UID) can be
     # nil for some providers and is not guaranteed unique across stores.
-    uid = event.eventIdentifier()
-    title = event.title() or ""
+    uid = _python_str(event.eventIdentifier())
+    title = _python_str(event.title()) or ""
     if not uid or not title:
         return None
 
@@ -103,38 +110,38 @@ def _ekevent_to_meeting(event) -> MeetingEvent | None:
     calendar_name = None
     ek_calendar = event.calendar()
     if ek_calendar:
-        calendar_name = ek_calendar.title()
+        calendar_name = _python_str(ek_calendar.title())
 
     organizer_name = None
     organizer_email = None
     ek_organizer = event.organizer()
     if ek_organizer:
-        organizer_name = ek_organizer.name() or None
+        organizer_name = _python_str(ek_organizer.name()) or None
         url = ek_organizer.URL()
         if url:
             resource = url.resourceSpecifier()
             if resource and resource.startswith("//"):
-                organizer_email = resource[2:].lower()
+                organizer_email = str(resource[2:]).lower()
             elif resource:
-                organizer_email = resource.lower()
+                organizer_email = str(resource).lower()
 
     attendees: list[dict[str, str]] = []
     ek_attendees = event.attendees() or []
     for participant in ek_attendees:
-        name = participant.name() or ""
+        name = _python_str(participant.name()) or ""
         email = ""
         p_url = participant.URL()
         if p_url:
             resource = p_url.resourceSpecifier()
             if resource and resource.startswith("//"):
-                email = resource[2:].lower()
+                email = str(resource[2:]).lower()
             elif resource:
-                email = resource.lower()
+                email = str(resource).lower()
         if name or email:
             attendees.append({"name": name, "email": email})
 
-    location = event.location() or None
-    notes = event.notes() or None
+    location = _python_str(event.location()) or None
+    notes = _python_str(event.notes()) or None
     url_value = None
     ek_url = event.URL()
     if ek_url:

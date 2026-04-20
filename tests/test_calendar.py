@@ -7,6 +7,17 @@ from unittest.mock import patch
 from briefing.calendar import EventKitClient, _ekevent_to_meeting
 
 
+class FakeNSString:
+    def __init__(self, value: str):
+        self.value = value
+
+    def __bool__(self) -> bool:
+        return bool(self.value)
+
+    def __str__(self) -> str:
+        return self.value
+
+
 def _make_ns_date(dt: datetime):
     """Create a fake NSDate-like object from a datetime."""
     return SimpleNamespace(timeIntervalSince1970=lambda: dt.timestamp())
@@ -138,6 +149,33 @@ def test_ekevent_to_meeting_captures_url() -> None:
 
     assert event is not None
     assert event.url == "https://meet.example.com/abc"
+
+
+def test_ekevent_to_meeting_normalizes_objc_string_like_values() -> None:
+    ek_event = _make_ek_event(
+        uid=FakeNSString("event-objc"),
+        title=FakeNSString("Harry"),
+        calendar_title=FakeNSString("Calendar"),
+        organizer_name=FakeNSString("Barry"),
+        organizer_email=FakeNSString("barry@example.edu"),
+        attendees=[(FakeNSString("Darren"), FakeNSString("darren@example.edu"))],
+        location=FakeNSString("Building A"),
+        notes=FakeNSString("Discuss status."),
+    )
+
+    event = _ekevent_to_meeting(ek_event)
+
+    assert event is not None
+    assert isinstance(event.uid, str)
+    assert isinstance(event.title, str)
+    assert isinstance(event.calendar_name, str)
+    assert isinstance(event.organizer_name, str)
+    assert event.uid == "event-objc"
+    assert event.title == "Harry"
+    assert event.organizer_email == "barry@example.edu"
+    assert event.attendees == [{"name": "Darren", "email": "darren@example.edu"}]
+    assert event.location == "Building A"
+    assert event.notes == "Discuss status."
 
 
 def test_eventkit_client_fetch_events_filters_all_day(app_settings) -> None:
