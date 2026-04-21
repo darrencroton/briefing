@@ -313,8 +313,8 @@ Usually one of:
 - no meeting starts between `window_min_minutes` and `window_max_minutes`
 - no series matched the event
 - more than one series matched the event
-- the note was already locked because content from `Meeting Notes` onward was edited
 - the meeting had already started
+- an existing note at the managed path had malformed frontmatter or an unrecoverable section layout
 
 ### A series exists but never matches
 
@@ -322,7 +322,11 @@ Review the YAML match groups. The most common issue is over-constraining the ser
 
 ### A note was created once but no longer refreshes
 
-This is usually intentional. If content from `Meeting Notes` onward differs from its placeholder, `briefing` treats that tail of the note as user-owned and stops rewriting the occurrence.
+`briefing` keeps refreshing only the managed `## Briefing` block until the meeting start time. If refresh stops earlier than that, the usual causes are:
+
+- the meeting start time has already passed
+- the note structure is malformed in a way `briefing` cannot reconcile safely
+- a required source or LLM step is failing for that occurrence
 
 ## Recommended rollout order
 

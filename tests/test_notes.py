@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from briefing.models import MeetingEvent, SourceResult
 from briefing.notes import (
+    NoteStructureError,
     build_sources_line,
     find_previous_note,
     normalize_summary_bullets,
-    note_is_locked,
     parse_frontmatter,
     refresh_note,
     render_note,
@@ -47,7 +49,14 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
     assert "## Meeting Notes\n\n- " in note
 
     updated = note.replace("## Meeting Notes\n\n- ", "## Meeting Notes\n\n- User note")
-    refreshed = refresh_note(updated, "- New summary bullet", [])
+    refreshed = refresh_note(
+        app_settings,
+        updated,
+        event,
+        series_config,
+        "- New summary bullet",
+        [],
+    )
 
     assert "- New summary bullet" in refreshed
     assert "- User note" in refreshed
@@ -55,7 +64,9 @@ def test_render_and_refresh_note_preserves_user_sections(app_settings, series_co
     assert "<!-- BRIEFING:" not in refreshed
 
 
-def test_refresh_note_preserves_same_level_sections_after_meeting_notes() -> None:
+def test_refresh_note_preserves_same_level_sections_after_meeting_notes(
+    app_settings, series_config
+) -> None:
     note = (
         "# Followup 10am–11am\n"
         "[[2026-04-08]] | [[Followup Meetings]]\n\n"
@@ -68,8 +79,22 @@ def test_refresh_note_preserves_same_level_sections_after_meeting_notes() -> Non
         "## Transcript Summary\n\n"
         "- AI-generated recap\n"
     )
+    event = MeetingEvent(
+        uid="event-1",
+        title="Followup",
+        start=datetime.fromisoformat("2026-04-08T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-08T11:00:00+10:00"),
+        calendar_name="Work",
+    )
 
-    refreshed = refresh_note(note, "- New summary", [])
+    refreshed = refresh_note(
+        app_settings,
+        note,
+        event,
+        series_config,
+        "- New summary",
+        [],
+    )
 
     assert "## Briefing\n\n- New summary" in refreshed
     assert "## Meeting Notes\n\n- User note" in refreshed
@@ -109,14 +134,185 @@ def test_render_note_keeps_both_meridiems_when_range_crosses(app_settings, serie
     assert "# Lunch 11:45am–12:15pm" in note
 
 
-def test_note_lock_detection_ignores_placeholder(app_settings) -> None:
-    unlocked = "## Meeting Notes\n\n- \n"
-    locked = "## Meeting Notes\n\n- Added an update\n"
-    locked_with_extra_section = "## Meeting Notes\n\n- \n\n## Transcript Summary\n\n- Added later\n"
+def test_refresh_note_injects_briefing_before_existing_meeting_notes(
+    app_settings, series_config
+) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = "# Prep\n\nBring draft agenda.\n\n## Meeting Notes\n\n- Discuss milestones\n"
 
-    assert note_is_locked(app_settings, unlocked) == (False, None)
-    assert note_is_locked(app_settings, locked) == (True, "meeting_notes_edited")
-    assert note_is_locked(app_settings, locked_with_extra_section) == (True, "meeting_notes_edited")
+    refreshed = refresh_note(
+        app_settings,
+        note,
+        event,
+        series_config,
+        "- New summary",
+        [],
+    )
+    frontmatter, body = parse_frontmatter(refreshed)
+
+    assert frontmatter == {
+        "title": "CAS Strategy Meeting 10–11am",
+        "series_id": "cas-strategy",
+        "start": "2026-04-13T10:00:00+10:00",
+    }
+    assert body.lstrip("\n").startswith("# Prep\n\nBring draft agenda.")
+    assert "## Briefing\n\n- New summary" in refreshed
+    assert "## Meeting Notes\n\n- Discuss milestones" in refreshed
+
+
+def test_refresh_note_appends_meeting_notes_if_missing(app_settings, series_config) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = (
+        "# Prep\n\n"
+        "## Briefing\n\n"
+        "- Stale summary\n\n"
+        "**Sources:** none\n"
+    )
+
+    refreshed = refresh_note(
+        app_settings,
+        note,
+        event,
+        series_config,
+        "- New summary",
+        [],
+    )
+
+    assert "## Briefing\n\n- New summary" in refreshed
+    assert "## Meeting Notes\n\n- " in refreshed
+    assert refreshed.rstrip().endswith("## Meeting Notes\n\n-")
+
+
+def test_refresh_note_rejects_briefing_without_meeting_notes_before_later_sections(
+    app_settings, series_config
+) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = (
+        "# Prep\n\n"
+        "## Briefing\n\n"
+        "- Stale summary\n\n"
+        "**Sources:** none\n\n"
+        "## Decisions\n\n"
+        "- Keep this section\n"
+    )
+
+    with pytest.raises(NoteStructureError, match="before later top-level sections"):
+        refresh_note(
+            app_settings,
+            note,
+            event,
+            series_config,
+            "- New summary",
+            [],
+        )
+
+
+def test_refresh_note_adopts_freeform_note_without_moving_content(app_settings, series_config) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = "# Prep\n\nAgenda ideas:\n- Budget\n- Hiring\n"
+
+    refreshed = refresh_note(
+        app_settings,
+        note,
+        event,
+        series_config,
+        "- New summary",
+        [],
+    )
+    _, body = parse_frontmatter(refreshed)
+
+    assert body.lstrip("\n").startswith("# Prep\n\nAgenda ideas:\n- Budget\n- Hiring\n")
+    assert "## Briefing\n\n- New summary" in refreshed
+    assert "## Meeting Notes\n\n- " in refreshed
+
+
+def test_refresh_note_merges_existing_frontmatter(app_settings, series_config) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = (
+        "---\n"
+        "aliases:\n"
+        "  - Prep note\n"
+        "series_id: old-series\n"
+        "---\n\n"
+        "# Prep\n\n"
+        "## Meeting Notes\n\n"
+        "- Discuss milestones\n"
+    )
+
+    refreshed = refresh_note(
+        app_settings,
+        note,
+        event,
+        series_config,
+        "- New summary",
+        [],
+    )
+    frontmatter, _ = parse_frontmatter(refreshed)
+
+    assert frontmatter == {
+        "aliases": ["Prep note"],
+        "series_id": "cas-strategy",
+        "title": "CAS Strategy Meeting 10–11am",
+        "start": "2026-04-13T10:00:00+10:00",
+    }
+
+
+def test_refresh_note_rejects_invalid_section_order(app_settings, series_config) -> None:
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    note = (
+        "# Prep\n\n"
+        "## Meeting Notes\n\n"
+        "- User content\n\n"
+        "## Briefing\n\n"
+        "- Stale summary\n\n"
+        "**Sources:** none\n"
+    )
+
+    with pytest.raises(NoteStructureError, match="must appear before"):
+        refresh_note(
+            app_settings,
+            note,
+            event,
+            series_config,
+            "- New summary",
+            [],
+        )
 
 
 def test_find_previous_note_uses_series_id_and_start(app_settings, series_config) -> None:

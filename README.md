@@ -10,7 +10,7 @@ You choose which meetings get briefings and which sources feed each one. A short
 
 Each meeting note gets a `## Briefing` section with a handful of bullets — typically 3 to 6 — that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. Each bullet ends with a compact source/date tag so you can see where the point came from. No filler, no channel-wide noise, no generic summaries.
 
-The rest of the note is yours. `briefing` only manages the briefing block; everything from `## Meeting Notes` onward is preserved and carried forward as previous-note context for the next briefing.
+The rest of the note is yours. `briefing` only manages the briefing block; everything from `## Meeting Notes` onward is preserved and carried forward as previous-note context for the next briefing. You can start drafting notes before the meeting and keep editing them while `briefing` continues to refresh the `## Briefing` block up until the meeting start time.
 
 ### How it works
 
@@ -20,7 +20,9 @@ When `briefing` runs (manually or via `launchd`), it:
 2. matches them against your configured meeting series
 3. collects context from each series' configured sources
 4. sends the context to an LLM CLI (`claude`, `codex`, `copilot`, or `gemini`)
-5. writes or refreshes the briefing block in the meeting note
+5. writes or refreshes the briefing block in the meeting note until the meeting starts
+
+If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside the managed briefing block.
 
 Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
 

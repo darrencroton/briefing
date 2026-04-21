@@ -11,7 +11,7 @@ from .calendar import EventKitClient
 from .llm import LLMError, get_provider
 from .matching import match_series
 from .models import MeetingEvent, OccurrenceState, SeriesConfig
-from .notes import note_is_locked, refresh_note, render_note
+from .notes import NoteStructureError, refresh_note, render_note
 from .prompts import render_summary_prompt
 from .settings import AppSettings, load_env_file, load_series_configs
 from .sources import collect_sources
@@ -125,16 +125,6 @@ def process_event(
     existed_before = output_path.exists()
     existing_text = output_path.read_text(encoding="utf-8") if existed_before else None
 
-    if state.locked:
-        logger.info("Skipping %s: occurrence already locked (%s)", event.title, state.lock_reason)
-        return {
-            "event_uid": event.uid,
-            "series_id": series.series_id,
-            "status": "skipped",
-            "reason": state.lock_reason or "locked",
-            "output_path": str(output_path),
-        }
-
     if now >= event.start:
         state.locked = True
         state.lock_reason = "meeting_started"
@@ -149,21 +139,20 @@ def process_event(
             "output_path": str(output_path),
         }
 
-    if existing_text is not None:
-        locked, reason = note_is_locked(settings, existing_text)
-        if locked:
-            state.locked = True
-            state.lock_reason = reason
-            state.last_status = "locked"
-            state_store.save_occurrence(state)
-            logger.info("Skipping %s: note locked because %s", event.title, reason)
-            return {
-                "event_uid": event.uid,
-                "series_id": series.series_id,
-                "status": "skipped",
-                "reason": reason,
-                "output_path": str(output_path),
-            }
+    if state.locked and state.lock_reason == "meeting_notes_edited":
+        logger.info("Recovering %s: clearing legacy lock reason %s", event.title, state.lock_reason)
+        state.locked = False
+        state.lock_reason = None
+
+    if state.locked:
+        logger.info("Skipping %s: occurrence already locked (%s)", event.title, state.lock_reason)
+        return {
+            "event_uid": event.uid,
+            "series_id": series.series_id,
+            "status": "skipped",
+            "reason": state.lock_reason or "locked",
+            "output_path": str(output_path),
+        }
 
     sources = collect_sources(settings, event, series, logger, env)
     blocking_errors = [source for source in sources if source.status == "error" and source.required]
@@ -219,21 +208,37 @@ def process_event(
         _source_hash_key(index, source): sha256_text(source.content)
         for index, source in enumerate(usable_sources)
     }
-    note_text = render_or_refresh_note(
-        settings=settings,
-        event=event,
-        series=series,
-        output_path=output_path,
-        existing_text=existing_text,
-        summary_bullets=llm_response.text,
-        source_results=sources,
-    )
+    try:
+        note_text = render_or_refresh_note(
+            settings=settings,
+            event=event,
+            series=series,
+            output_path=output_path,
+            existing_text=existing_text,
+            summary_bullets=llm_response.text,
+            source_results=sources,
+        )
+    except NoteStructureError as exc:
+        state.last_status = "error"
+        state.last_error = str(exc)
+        state_store.save_occurrence(state)
+        logger.error("Existing note could not be refreshed for %s: %s", event.title, exc)
+        return {
+            "event_uid": event.uid,
+            "series_id": series.series_id,
+            "status": "error",
+            "reason": "note_reconciliation_failed",
+            "error": str(exc),
+            "output_path": str(output_path),
+        }
     if (
         existing_text is not None
         and state.summary_hash == summary_hash
         and state.source_hashes == source_hashes
         and existing_text == note_text
     ):
+        state.locked = False
+        state.lock_reason = None
         state.last_status = "unchanged"
         state.last_generated_at = now.isoformat()
         state_store.save_occurrence(state)
@@ -248,6 +253,8 @@ def process_event(
     if not dry_run:
         output_path.write_text(note_text, encoding="utf-8")
 
+    state.locked = False
+    state.lock_reason = None
     state.last_status = "written"
     state.last_error = None
     state.source_hashes = source_hashes
@@ -285,7 +292,9 @@ def render_or_refresh_note(
     """Create or refresh a note in managed mode."""
     template = (settings.paths.template_dir / settings.llm.note_template).read_text(encoding="utf-8")
     if existing_text is not None:
-        return refresh_note(existing_text, summary_bullets, source_results)
+        if not existing_text.strip():
+            return render_note(settings, template, event, series, summary_bullets, source_results)
+        return refresh_note(settings, existing_text, event, series, summary_bullets, source_results)
     return render_note(settings, template, event, series, summary_bullets, source_results)
 
 

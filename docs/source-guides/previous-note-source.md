@@ -12,7 +12,7 @@ If you want the short version first:
 
 1. [Make sure one recurring meeting consistently matches one `series_id`](#step-1-make-the-series-match-reliably).
 2. [Do not change that `series_id` after notes have been created](#step-2-keep-series_id-stable).
-3. [Let `briefing` create the first note for that series](#step-3-let-the-first-note-be-created).
+3. [Make sure the first note for that series ends up with the managed metadata and sections](#step-3-create-or-adopt-the-first-note).
 4. [Keep using the normal `Briefing` and `Meeting Notes` sections](#step-4-keep-the-managed-note-structure-intact).
 5. [On the next occurrence, confirm the new note clearly reflects the previous one](#step-5-check-that-it-is-working).
 
@@ -47,7 +47,7 @@ To make the previous-note source useful, focus on the parts of the setup that de
 
 1. make sure the meeting series matches reliably
 2. keep the same `series_id` for the same recurring meeting
-3. let `briefing` create at least one note for that series
+3. make sure there is at least one note for that series with the managed frontmatter and note sections
 4. keep using that series for later occurrences
 
 ## Step 1. Make The Series Match Reliably
@@ -77,7 +77,7 @@ If you are inspecting an older note directly, look in the frontmatter at the top
 
 If you need to rename a series for presentation reasons, prefer changing `display_name` first and leaving `series_id` alone.
 
-## Step 3. Let The First Note Be Created
+## Step 3. Create Or Adopt The First Note
 
 The first occurrence in a new series will not have a previous note yet. That is expected.
 
@@ -88,6 +88,8 @@ uv run briefing run
 ```
 
 Once the first note exists, later runs in the same series can use it as historical context.
+
+If you prefer to create the note manually in advance, that can also work. `briefing` can adopt an existing note by adding the managed frontmatter plus `## Briefing` and `## Meeting Notes` sections it needs, as long as the note structure is still simple enough to reconcile safely.
 
 ## Step 4. Keep The Managed Note Structure Intact
 
@@ -139,7 +141,7 @@ If you changed `series_id`, that is the most likely cause. Restore the original 
 For a new install:
 
 1. get one recurring series matching correctly
-2. let `briefing` create the first note
+2. let `briefing` create the first note, or pre-create one that `briefing` can adopt safely
 3. attend the meeting and add useful notes
 4. let the next occurrence reuse that material
 5. only then decide whether extra sources are actually necessary
