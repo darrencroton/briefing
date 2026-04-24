@@ -7,7 +7,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .models import MeetingEvent, OccurrenceState
+from .models import MeetingEvent, OccurrenceState, SessionPlanState
 from .settings import AppSettings
 from .utils import ensure_directory, sha256_text
 
@@ -22,6 +22,7 @@ class StateStore:
         self.settings = settings
         self.state_dir = ensure_directory(settings.paths.state_dir)
         self.occurrence_dir = ensure_directory(self.state_dir / "occurrences")
+        self.session_plan_dir = ensure_directory(self.state_dir / "session-plans")
         self.runs_dir = ensure_directory(self.state_dir / "runs")
 
     def occurrence_key(self, event: MeetingEvent) -> str:
@@ -32,6 +33,10 @@ class StateStore:
         """
         utc_start = event.start.astimezone(timezone.utc).isoformat()
         return sha256_text(f"{event.uid}|{utc_start}")[:24]
+
+    def session_plan_key(self, event_uid: str) -> str:
+        """Create a stable key for one calendar event's recording plan."""
+        return sha256_text(event_uid)[:24]
 
     def load_occurrence(self, occurrence_key: str) -> OccurrenceState | None:
         """Load stored occurrence state."""
@@ -47,6 +52,35 @@ class StateStore:
         path.write_text(json.dumps(asdict(occurrence), indent=2), encoding="utf-8")
         self._prune_occurrences(datetime.now(timezone.utc))
         return path
+
+    def load_session_plan(self, occurrence_key: str) -> SessionPlanState | None:
+        """Load stored session planning state."""
+        path = self.session_plan_dir / f"{occurrence_key}.json"
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return SessionPlanState(**data)
+
+    def load_session_plan_for_event(self, event: MeetingEvent) -> SessionPlanState | None:
+        """Load session planning state by stable calendar event UID."""
+        return self.load_session_plan(self.session_plan_key(event.uid))
+
+    def save_session_plan(self, plan: SessionPlanState) -> Path:
+        """Persist session planning state."""
+        path = self.session_plan_dir / f"{self.session_plan_key(plan.event_uid)}.json"
+        path.write_text(json.dumps(asdict(plan), indent=2), encoding="utf-8")
+        return path
+
+    def list_session_plans(self) -> list[SessionPlanState]:
+        """Return all stored session plans."""
+        plans: list[SessionPlanState] = []
+        for path in sorted(self.session_plan_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                plans.append(SessionPlanState(**payload))
+            except (OSError, json.JSONDecodeError, TypeError):
+                continue
+        return plans
 
     def write_run_diagnostic(self, payload: dict[str, object], now: datetime) -> Path:
         """Write one machine-readable run diagnostic."""

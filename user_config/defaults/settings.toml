@@ -9,6 +9,27 @@ series_dir = "user_config/series"
 debug_dir = "tmp"
 env_file = "~/.env.briefing"
 
+[meeting_intelligence]
+sessions_root = "sessions"
+noted_command = "noted"
+pre_roll_seconds = 90
+reschedule_tolerance_seconds = 300
+watch_poll_seconds = 30
+watch_lookahead_minutes = 180
+default_host_name = "Meeting host"
+default_language = "en-AU"
+default_asr_backend = "whisperkit"
+default_diarization_enabled = true
+default_mode = "in_person"
+# Leave blank/omitted to use paths.meeting_notes_dir for one-off noted config events.
+# one_off_note_dir = "~/Notes/Meetings"
+auto_start = true
+auto_stop = true
+default_extension_minutes = 10
+max_single_extension_minutes = 15
+pre_end_prompt_minutes = 5
+no_interaction_grace_minutes = 5
+
 [calendar]
 include_all_day = false
 window_min_minutes = 10

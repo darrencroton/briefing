@@ -13,7 +13,9 @@ from .settings import load_settings
 
 _RUNTIME_DIRECTORIES = (
     Path("logs"),
+    Path("sessions"),
     Path("state/occurrences"),
+    Path("state/session-plans"),
     Path("state/runs"),
     Path("tmp"),
     Path("user_config/series"),

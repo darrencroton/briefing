@@ -102,6 +102,38 @@ class SeriesSources:
 
 
 @dataclass(slots=True)
+class RecordingPolicyConfig:
+    """Optional recording policy overrides for a series or calendar marker."""
+
+    auto_start: bool | None = None
+    auto_stop: bool | None = None
+    default_extension_minutes: int | None = None
+    max_single_extension_minutes: int | None = None
+    pre_end_prompt_minutes: int | None = None
+    no_interaction_grace_minutes: int | None = None
+
+
+@dataclass(slots=True)
+class RecordingConfig:
+    """Meeting Intelligence recording metadata."""
+
+    record: bool | None = None
+    mode: str | None = None
+    audio_strategy: str | None = None
+    host_name: str | None = None
+    attendees_expected: int | None = None
+    participant_names: list[str] = field(default_factory=list)
+    names_are_hints_only: bool = True
+    language: str | None = None
+    asr_backend: str | None = None
+    diarization_enabled: bool | None = None
+    speaker_count_hint: int | None = None
+    note_dir: str | None = None
+    note_slug: str | None = None
+    recording_policy: RecordingPolicyConfig = field(default_factory=RecordingPolicyConfig)
+
+
+@dataclass(slots=True)
 class SeriesConfig:
     """A meeting series definition."""
 
@@ -111,6 +143,7 @@ class SeriesConfig:
     note_slug: str
     match: MatchRules
     sources: SeriesSources = field(default_factory=SeriesSources)
+    recording: RecordingConfig = field(default_factory=RecordingConfig)
     overrides: dict[str, Any] = field(default_factory=dict)
 
 
@@ -158,3 +191,23 @@ class ValidationMessage:
     level: str
     code: str
     message: str
+
+
+@dataclass(slots=True)
+class SessionPlanState:
+    """Stored state for one planned recording session."""
+
+    occurrence_key: str
+    event_uid: str
+    start_iso: str
+    title: str
+    session_id: str
+    manifest_path: str
+    session_dir: str
+    note_path: str
+    status: str = "planned"
+    planned_at: str | None = None
+    launched_at: str | None = None
+    launch_exit_code: int | None = None
+    invalidated_at: str | None = None
+    invalidation_reason: str | None = None

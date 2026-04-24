@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -11,11 +12,13 @@ import yaml
 
 from .calendar import EventKitClient
 from .logging_utils import configure_logging
+from .planning import plan_event_by_id
 from .session.ingest import IngestResult, emit_stdout_result, run_session_ingest
 from .settings import SettingsError, load_series_configs, load_settings
 from .runner import run_briefing
 from .utils import ensure_directory, slugify
 from .validation import validate_environment
+from .watch import run_watch
 
 
 def cli() -> int:
@@ -44,6 +47,20 @@ def cli() -> int:
         help="Path to the session directory produced by noted",
     )
 
+    plan_parser = subparsers.add_parser(
+        "session-plan",
+        help="Write a noted manifest for one calendar event",
+    )
+    plan_parser.add_argument("--event-id", required=True, help="Calendar event UID to plan")
+    plan_parser.add_argument("--now", help="Override current time with an ISO timestamp")
+
+    watch_parser = subparsers.add_parser(
+        "watch",
+        help="Watch upcoming meetings and launch noted at pre-roll",
+    )
+    watch_parser.add_argument("--once", action="store_true", help="Run one watch cycle and exit")
+    watch_parser.add_argument("--dry-run", action="store_true", help="Plan but do not launch noted")
+
     args = parser.parse_args()
     try:
         settings = load_settings()
@@ -61,6 +78,11 @@ def cli() -> int:
         return _init_series(settings, args.event_uid, args.index, args.force)
     if args.command == "session-ingest":
         return _session_ingest(settings, args.session_dir)
+    if args.command == "session-plan":
+        now = datetime.fromisoformat(args.now) if args.now else None
+        return _session_plan(settings, args.event_id, now)
+    if args.command == "watch":
+        return run_watch(settings, once=args.once, dry_run=args.dry_run)
     return 1
 
 
@@ -87,6 +109,26 @@ def _session_ingest(settings, session_dir_arg: str) -> int:
     result = run_session_ingest(settings, session_dir)
     emit_stdout_result(result)
     return result.exit_code
+
+
+def _session_plan(settings, event_id: str, now: datetime | None) -> int:
+    try:
+        result = plan_event_by_id(settings, event_id, now=now)
+    except Exception as exc:
+        print(
+            json.dumps({
+                "ok": False,
+                "status": "error",
+                "event_uid": event_id,
+                "skip_reason": str(exc),
+            }, sort_keys=True),
+            file=sys.stderr,
+        )
+        return 1
+    print(result.to_json_line())
+    if result.status == "not_found":
+        return 2
+    return 0
 
 
 def _validate(settings) -> int:

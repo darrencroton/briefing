@@ -8,6 +8,7 @@ It covers:
 - how to get a minimal working setup
 - how to choose and validate an LLM CLI
 - how `init-series` works
+- how Meeting Intelligence planning and `noted` recording handoff works
 - what to check when validation or runs fail
 
 Use the source-specific guides under [`source-guides/`](source-guides/README.md) after the base local flow is working.
@@ -25,6 +26,12 @@ The runtime flow is:
 5. invoke the configured LLM CLI
 6. write or refresh the managed `Briefing` block
 7. save occurrence state and run diagnostics
+
+The Meeting Intelligence recording flow adds:
+
+1. `briefing session-plan --event-id <id>` writes a contract-valid `manifest.json`
+2. `briefing watch` polls upcoming events, refreshes pre-written next manifests, and invokes `noted start --manifest <path>` at pre-roll
+3. `briefing session-ingest --session-dir <path>` reads `completion.json` and writes the managed `Meeting Summary` block
 
 Important behavior:
 
@@ -66,6 +73,8 @@ The default `paths.series_dir` is already correct for the repo:
 ```toml
 paths.series_dir = "user_config/series"
 ```
+
+For recording handoff, review `[meeting_intelligence]`. The defaults write session manifests under `sessions/`, call `noted`, and launch 90 seconds before the scheduled start.
 
 ### 3. Grant Calendar access
 
@@ -129,6 +138,12 @@ uv run briefing run
 
 By default this processes meetings starting between 15 and 45 minutes from now.
 
+To dry-run the long-lived recorder planner without launching `noted`:
+
+```bash
+uv run briefing watch --once --dry-run
+```
+
 ## LLM provider setup
 
 `briefing` is CLI-only. It supports these provider values in `[llm]`:
@@ -187,6 +202,54 @@ When it writes a file, the generated YAML includes:
 
 `init-series` is a bootstrap tool, not a final configuration writer. Review the generated file and tighten the match rules before relying on it.
 
+### Recording metadata
+
+Configured series are eligible for `briefing watch` recording by default. Add `recording.record: false` to opt out, or add field-level defaults:
+
+```yaml
+recording:
+  record: true
+  mode: online
+  participants:
+    host_name: Casey
+    attendees_expected: 4
+  transcription:
+    language: en-AU
+    asr_backend: whisperkit
+    diarization_enabled: true
+```
+
+Calendar notes can override these fields for one occurrence with a case-insensitive marker:
+
+```text
+noted config:
+mode: hybrid
+participants:
+  host_name: Riley
+recording_policy:
+  default_extension_minutes: 15
+```
+
+Use `record: false` under the marker to skip recording for one otherwise matched occurrence. Events with a `noted config` marker are also eligible as one-off recordings even without a series file.
+
+## Planning and watch commands
+
+Write one manifest by event id:
+
+```bash
+uv run briefing session-plan --event-id "EVENT-UID-HERE"
+```
+
+The command prints one JSON line containing `status`, `manifest_path`, `session_dir`, `note_path`, and `skip_reason` when skipped.
+
+Run the watcher:
+
+```bash
+uv run briefing watch
+```
+
+`briefing watch` persists plan state under `state/session-plans/`, writes manifests under `[meeting_intelligence].sessions_root`, and archives invalidated unlaunched manifests under `archive/manifests/` rather than deleting them.
+
 ## Global settings reference
 
 ### `[paths]`
@@ -200,6 +263,18 @@ When it writes a file, the generated YAML includes:
 - `series_dir`: local series YAML directory
 - `debug_dir`: local debug output directory
 - `env_file`: env file loaded for source tokens
+
+### `[meeting_intelligence]`
+
+- `sessions_root`: local root for planned noted session directories and manifests
+- `noted_command`: executable used for `noted start --manifest`
+- `pre_roll_seconds`: launch lead time; must be between 60 and 180 seconds
+- `reschedule_tolerance_seconds`: in-tolerance calendar movement rewrites a plan; larger movement invalidates it
+- `watch_poll_seconds`: delay between `briefing watch` polling cycles
+- `watch_lookahead_minutes`: calendar lookahead for watch planning
+- `default_host_name`, `default_language`, `default_asr_backend`, `default_diarization_enabled`, `default_mode`: manifest defaults
+- `one_off_note_dir`: optional note directory for one-off `noted config` events; defaults to `paths.meeting_notes_dir`
+- `auto_start`, `auto_stop`, `default_extension_minutes`, `max_single_extension_minutes`, `pre_end_prompt_minutes`, `no_interaction_grace_minutes`: default recording policy fields
 
 ### `[calendar]`
 

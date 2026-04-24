@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+
 from .calendar import EventKitClient
 from .llm import get_provider
 from .models import ValidationMessage
@@ -32,6 +34,41 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
     if not settings.paths.template_dir.joinpath(settings.llm.note_template).exists():
         messages.append(
             ValidationMessage("error", "note_template_missing", "Note template is missing")
+        )
+
+    sessions_parent = settings.meeting_intelligence.sessions_root.parent
+    if sessions_parent.exists():
+        messages.append(
+            ValidationMessage(
+                "info",
+                "sessions_root_parent_ok",
+                f"Sessions root parent found: {sessions_parent}",
+            )
+        )
+    else:
+        messages.append(
+            ValidationMessage(
+                "error",
+                "sessions_root_parent_missing",
+                f"Sessions root parent not found: {sessions_parent}",
+            )
+        )
+
+    if shutil.which(settings.meeting_intelligence.noted_command):
+        messages.append(
+            ValidationMessage(
+                "info",
+                "noted_command_ok",
+                f"noted command found: {settings.meeting_intelligence.noted_command}",
+            )
+        )
+    else:
+        messages.append(
+            ValidationMessage(
+                "warning",
+                "noted_command_missing",
+                f"noted command not found on PATH: {settings.meeting_intelligence.noted_command}",
+            )
         )
 
     if not series_configs:

@@ -6,7 +6,9 @@ __pycache__/
 *.pyc
 archive/
 logs/*.log
+sessions/
 state/occurrences/*.json
+state/session-plans/*.json
 state/runs/*.json
 tmp/
 user_config/*

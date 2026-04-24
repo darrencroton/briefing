@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from briefing.settings import SettingsError, load_settings
+from briefing.settings import SettingsError, load_series_configs, load_settings
 
 
 SETTINGS_HEADER = """
@@ -18,6 +18,25 @@ template_dir = "user_config/templates"
 series_dir = "user_config/series"
 debug_dir = "tmp"
 env_file = "~/.env.briefing"
+
+[meeting_intelligence]
+sessions_root = "sessions"
+noted_command = "noted"
+pre_roll_seconds = 90
+reschedule_tolerance_seconds = 300
+watch_poll_seconds = 30
+watch_lookahead_minutes = 180
+default_host_name = "Meeting host"
+default_language = "en-AU"
+default_asr_backend = "whisperkit"
+default_diarization_enabled = true
+default_mode = "in_person"
+auto_start = true
+auto_stop = true
+default_extension_minutes = 10
+max_single_extension_minutes = 15
+pre_end_prompt_minutes = 5
+no_interaction_grace_minutes = 5
 
 [calendar]
 include_all_day = false
@@ -181,3 +200,92 @@ note_template = "meeting_note.md"
     settings = load_settings(tmp_path)
 
     assert settings.llm.command == "codex"
+
+
+def test_load_settings_parses_meeting_intelligence_defaults(tmp_path: Path) -> None:
+    _write_settings(
+        tmp_path,
+        """
+provider = "codex"
+command = ""
+model = "gpt-5.4"
+effort = "medium"
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+""",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.meeting_intelligence.sessions_root == tmp_path / "sessions"
+    assert settings.meeting_intelligence.pre_roll_seconds == 90
+    assert settings.meeting_intelligence.one_off_note_dir == settings.paths.meeting_notes_dir
+
+
+def test_load_settings_rejects_out_of_bounds_pre_roll(tmp_path: Path) -> None:
+    user_config_dir = tmp_path / "user_config"
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    text = SETTINGS_HEADER.replace("pre_roll_seconds = 90", "pre_roll_seconds = 30")
+    (user_config_dir / "settings.toml").write_text(
+        f"{text}\n\n[llm]\n"
+        "provider = \"codex\"\n"
+        "command = \"\"\n"
+        "model = \"gpt-5.4\"\n"
+        "effort = \"medium\"\n"
+        "timeout_seconds = 600\n"
+        "retry_attempts = 3\n"
+        "temperature = 0.2\n"
+        "max_output_tokens = 4096\n"
+        "prompt_template = \"pre_meeting_summary.md\"\n"
+        "note_template = \"meeting_note.md\"\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="pre_roll_seconds"):
+        load_settings(tmp_path)
+
+
+def test_load_settings_rejects_invalid_meeting_intelligence_boolean_string(tmp_path: Path) -> None:
+    user_config_dir = tmp_path / "user_config"
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+    text = SETTINGS_HEADER.replace("auto_start = true", 'auto_start = "flase"')
+    (user_config_dir / "settings.toml").write_text(
+        f"{text}\n\n[llm]\n"
+        "provider = \"codex\"\n"
+        "command = \"\"\n"
+        "model = \"gpt-5.4\"\n"
+        "effort = \"medium\"\n"
+        "timeout_seconds = 600\n"
+        "retry_attempts = 3\n"
+        "temperature = 0.2\n"
+        "max_output_tokens = 4096\n"
+        "prompt_template = \"pre_meeting_summary.md\"\n"
+        "note_template = \"meeting_note.md\"\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="auto_start"):
+        load_settings(tmp_path)
+
+
+def test_load_series_configs_rejects_invalid_recording_boolean_string(app_settings) -> None:
+    (app_settings.paths.series_dir / "bad.yaml").write_text(
+        """
+series_id: bad
+display_name: Bad
+note_slug: bad
+match:
+  title_any:
+    - Bad
+recording:
+  record: flase
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="boolean"):
+        load_series_configs(app_settings)

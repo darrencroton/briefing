@@ -17,6 +17,8 @@ from .models import (
     FileSourceConfig,
     MatchRules,
     NotionSourceConfig,
+    RecordingConfig,
+    RecordingPolicyConfig,
     SeriesConfig,
     SeriesSources,
     SlackSourceConfig,
@@ -39,6 +41,28 @@ class PathsSettings:
     series_dir: Path
     debug_dir: Path
     env_file: Path
+
+
+@dataclass(slots=True)
+class MeetingIntelligenceSettings:
+    sessions_root: Path
+    noted_command: str
+    pre_roll_seconds: int
+    reschedule_tolerance_seconds: int
+    watch_poll_seconds: int
+    watch_lookahead_minutes: int
+    default_host_name: str
+    default_language: str
+    default_asr_backend: str
+    default_diarization_enabled: bool
+    default_mode: str
+    one_off_note_dir: Path
+    auto_start: bool
+    auto_stop: bool
+    default_extension_minutes: int
+    max_single_extension_minutes: int
+    pre_end_prompt_minutes: int
+    no_interaction_grace_minutes: int
 
 
 @dataclass(slots=True)
@@ -118,6 +142,7 @@ class LoggingSettings:
 class AppSettings:
     repo_root: Path
     paths: PathsSettings
+    meeting_intelligence: MeetingIntelligenceSettings
     calendar: CalendarSettings
     execution: ExecutionSettings
     output: OutputSettings
@@ -138,6 +163,9 @@ _DEFAULT_LLM_COMMANDS = {
     "copilot": "copilot",
     "gemini": "gemini",
 }
+_VALID_MODE_TYPES = ("in_person", "online", "hybrid")
+_VALID_AUDIO_STRATEGIES = ("room_mic", "mic_plus_system")
+_VALID_ASR_BACKENDS = ("whisperkit", "fluidaudio-parakeet", "sfspeech")
 
 
 def load_settings(repo_root: Path | None = None) -> AppSettings:
@@ -165,20 +193,26 @@ def load_settings(repo_root: Path | None = None) -> AppSettings:
         calendar["exclude_calendar_names"] = _coerce_string_list(
             calendar.get("exclude_calendar_names"), "calendar", "exclude_calendar_names"
         )
+        parsed_paths = PathsSettings(
+            vault_root=expand_path(paths["vault_root"], repo_root),
+            meeting_notes_dir=expand_path(
+                str(Path(paths["vault_root"]) / paths["meeting_notes_dir"]), repo_root
+            ),
+            log_dir=expand_path(paths["log_dir"], repo_root),
+            state_dir=expand_path(paths["state_dir"], repo_root),
+            prompt_dir=expand_path(paths["prompt_dir"], repo_root),
+            template_dir=expand_path(paths["template_dir"], repo_root),
+            series_dir=expand_path(paths["series_dir"], repo_root),
+            debug_dir=expand_path(paths["debug_dir"], repo_root),
+            env_file=expand_path(paths["env_file"], repo_root),
+        )
         return AppSettings(
             repo_root=repo_root,
-            paths=PathsSettings(
-                vault_root=expand_path(paths["vault_root"], repo_root),
-                meeting_notes_dir=expand_path(
-                    str(Path(paths["vault_root"]) / paths["meeting_notes_dir"]), repo_root
-                ),
-                log_dir=expand_path(paths["log_dir"], repo_root),
-                state_dir=expand_path(paths["state_dir"], repo_root),
-                prompt_dir=expand_path(paths["prompt_dir"], repo_root),
-                template_dir=expand_path(paths["template_dir"], repo_root),
-                series_dir=expand_path(paths["series_dir"], repo_root),
-                debug_dir=expand_path(paths["debug_dir"], repo_root),
-                env_file=expand_path(paths["env_file"], repo_root),
+            paths=parsed_paths,
+            meeting_intelligence=_parse_meeting_intelligence_settings(
+                data.get("meeting_intelligence") or {},
+                repo_root,
+                parsed_paths.meeting_notes_dir,
             ),
             calendar=CalendarSettings(**calendar),
             execution=ExecutionSettings(**data["execution"]),
@@ -262,6 +296,7 @@ def load_series_configs(settings: AppSettings) -> list[SeriesConfig]:
                         for item in sources_raw.get("email", [])
                     ],
                 ),
+                recording=_parse_recording_config(raw.get("recording") or raw.get("meeting_intelligence")),
                 overrides=dict(raw.get("overrides") or {}),
             )
         )
@@ -298,6 +333,157 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _parse_meeting_intelligence_settings(
+    raw: Any,
+    repo_root: Path,
+    meeting_notes_dir: Path,
+) -> MeetingIntelligenceSettings:
+    if not isinstance(raw, dict):
+        raise SettingsError("Invalid settings file: [meeting_intelligence] must be a table.")
+
+    pre_roll = int(raw.get("pre_roll_seconds", 90))
+    if not 60 <= pre_roll <= 180:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].pre_roll_seconds must be between 60 and 180."
+        )
+
+    default_mode = str(raw.get("default_mode", "in_person")).strip()
+    if default_mode not in _VALID_MODE_TYPES:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].default_mode must be one of "
+            f"{', '.join(_VALID_MODE_TYPES)}."
+        )
+
+    asr_backend = str(raw.get("default_asr_backend", "whisperkit")).strip()
+    if asr_backend not in _VALID_ASR_BACKENDS:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].default_asr_backend must be one of "
+            f"{', '.join(_VALID_ASR_BACKENDS)}."
+        )
+
+    noted_command = str(raw.get("noted_command", "noted")).strip() or "noted"
+    one_off_note_dir_raw = raw.get("one_off_note_dir")
+    one_off_note_dir = (
+        expand_path(str(one_off_note_dir_raw), repo_root)
+        if one_off_note_dir_raw
+        else meeting_notes_dir
+    )
+
+    return MeetingIntelligenceSettings(
+        sessions_root=expand_path(str(raw.get("sessions_root", "sessions")), repo_root),
+        noted_command=noted_command,
+        pre_roll_seconds=pre_roll,
+        reschedule_tolerance_seconds=int(raw.get("reschedule_tolerance_seconds", 300)),
+        watch_poll_seconds=int(raw.get("watch_poll_seconds", 30)),
+        watch_lookahead_minutes=int(raw.get("watch_lookahead_minutes", 180)),
+        default_host_name=str(raw.get("default_host_name", "Meeting host")).strip() or "Meeting host",
+        default_language=str(raw.get("default_language", "en-AU")).strip() or "en-AU",
+        default_asr_backend=asr_backend,
+        default_diarization_enabled=_required_bool(
+            raw.get("default_diarization_enabled"),
+            True,
+            "[meeting_intelligence].default_diarization_enabled",
+        ),
+        default_mode=default_mode,
+        one_off_note_dir=one_off_note_dir,
+        auto_start=_required_bool(raw.get("auto_start"), True, "[meeting_intelligence].auto_start"),
+        auto_stop=_required_bool(raw.get("auto_stop"), True, "[meeting_intelligence].auto_stop"),
+        default_extension_minutes=int(raw.get("default_extension_minutes", 10)),
+        max_single_extension_minutes=int(raw.get("max_single_extension_minutes", 15)),
+        pre_end_prompt_minutes=int(raw.get("pre_end_prompt_minutes", 5)),
+        no_interaction_grace_minutes=int(raw.get("no_interaction_grace_minutes", 5)),
+    )
+
+
+def _parse_recording_config(raw: Any) -> RecordingConfig:
+    if not raw:
+        return RecordingConfig()
+    if not isinstance(raw, dict):
+        raise SettingsError("Invalid series config: recording must be a mapping.")
+
+    participants = raw.get("participants") or {}
+    if not isinstance(participants, dict):
+        raise SettingsError("Invalid series config: recording.participants must be a mapping.")
+
+    transcription = raw.get("transcription") or {}
+    if not isinstance(transcription, dict):
+        raise SettingsError("Invalid series config: recording.transcription must be a mapping.")
+
+    mode_raw = raw.get("mode")
+    mode_type: str | None = None
+    audio_strategy: str | None = None
+    if isinstance(mode_raw, dict):
+        mode_type = _optional_str(mode_raw.get("type"))
+        audio_strategy = _optional_str(mode_raw.get("audio_strategy"))
+    else:
+        mode_type = _optional_str(mode_raw)
+        audio_strategy = _optional_str(raw.get("audio_strategy"))
+
+    policy_raw = raw.get("recording_policy") or raw.get("policy") or {}
+    if not isinstance(policy_raw, dict):
+        raise SettingsError("Invalid series config: recording.recording_policy must be a mapping.")
+
+    return RecordingConfig(
+        record=_optional_bool(raw.get("record")),
+        mode=mode_type,
+        audio_strategy=audio_strategy,
+        host_name=_optional_str(participants.get("host_name", raw.get("host_name"))),
+        attendees_expected=_optional_int(participants.get("attendees_expected", raw.get("attendees_expected"))),
+        participant_names=[str(item) for item in participants.get("participant_names", raw.get("participant_names", []))],
+        names_are_hints_only=True,
+        language=_optional_str(transcription.get("language", raw.get("language"))),
+        asr_backend=_optional_str(transcription.get("asr_backend", raw.get("asr_backend"))),
+        diarization_enabled=_optional_bool(
+            transcription.get("diarization_enabled", raw.get("diarization_enabled"))
+        ),
+        speaker_count_hint=_optional_int(
+            transcription.get("speaker_count_hint", raw.get("speaker_count_hint"))
+        ),
+        note_dir=_optional_str(raw.get("note_dir")),
+        note_slug=_optional_str(raw.get("note_slug")),
+        recording_policy=RecordingPolicyConfig(
+            auto_start=_optional_bool(policy_raw.get("auto_start")),
+            auto_stop=_optional_bool(policy_raw.get("auto_stop")),
+            default_extension_minutes=_optional_int(policy_raw.get("default_extension_minutes")),
+            max_single_extension_minutes=_optional_int(policy_raw.get("max_single_extension_minutes")),
+            pre_end_prompt_minutes=_optional_int(policy_raw.get("pre_end_prompt_minutes")),
+            no_interaction_grace_minutes=_optional_int(policy_raw.get("no_interaction_grace_minutes")),
+        ),
+    )
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return _bool_from_value(value, "series config")
+
+
+def _required_bool(value: Any, default: bool, context: str) -> bool:
+    if value is None:
+        return default
+    return _bool_from_value(value, context)
+
+
+def _bool_from_value(value: Any, context: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes", "y", "1", "on"}:
+            return True
+        if normalized in {"false", "no", "n", "0", "off"}:
+            return False
+        raise SettingsError(f"Invalid {context}: boolean value {value!r} is not recognized.")
+    raise SettingsError(f"Invalid {context}: expected a boolean value, got {value!r}.")
 
 
 def _parse_llm_settings(raw: Any) -> dict[str, Any]:

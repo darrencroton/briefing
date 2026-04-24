@@ -21,3 +21,13 @@ sources:
     - label: Project tracker
       path: ~/Documents/projects/barry-tracker.md
       required: false
+recording:
+  record: true
+  mode: online
+  participants:
+    host_name: Barry
+    attendees_expected: 4
+  transcription:
+    language: en-AU
+    asr_backend: whisperkit
+    diarization_enabled: true

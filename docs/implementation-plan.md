@@ -73,6 +73,10 @@ Phase 4 planning/watch focused estimate: 35 days.
 - What reschedule tolerance should `briefing watch` use when deciding to rewrite versus delete a next manifest?
 - Should `briefing watch` persist planned manifest state in the existing `StateStore` or a dedicated session-planning state file?
 
+### Implementation Note
+
+- Product decision: pre-prepared manifests may be updated before they are consumed by `noted` when that is required for the desired UX, including active-meeting `next_meeting` refresh and in-tolerance calendar reschedules. Future contract work should align manifest mutability wording with this behavior rather than treating every planned manifest as immutable from first write.
+
 ## Phase 4 - Session Ingestion and Summarisation
 
 Goal: `briefing session-ingest --session-dir <path>` reads `outputs/completion.json` first, consumes completed transcripts, generates a post-meeting summary, and appends a managed summary block after the user's `## Meeting Notes` content.
