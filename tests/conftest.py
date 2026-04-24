@@ -35,6 +35,14 @@ def app_settings(tmp_path: Path) -> AppSettings:
         "Meeting:\n{{MEETING_CONTEXT}}\n\nSources:\n{{SOURCE_BLOCKS}}\n",
         encoding="utf-8",
     )
+    (prompt_dir / "post_meeting_summary.md").write_text(
+        "Attribution: {{ATTRIBUTION_POLICY}}\n"
+        "Warnings: {{WARNINGS}}\n"
+        "Meeting:\n{{MEETING_CONTEXT}}\n\n"
+        "Participants:\n{{PARTICIPANTS}}\n\n"
+        "Transcript:\n{{TRANSCRIPT}}\n",
+        encoding="utf-8",
+    )
     (template_dir / "meeting_note.md").write_text(
         "{{FRONTMATTER}}\n# {{HEADING}}\n[[{{DATE_LINK}}]] | [[{{SERIES_LINK}}]]\n\n---\n{{BRIEFING_BLOCK}}\n\n---\n## Meeting Notes\n\n{{MEETING_NOTES_PLACEHOLDER}}\n",
         encoding="utf-8",

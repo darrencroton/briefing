@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import yaml
 
 from .calendar import EventKitClient
 from .logging_utils import configure_logging
+from .session.ingest import IngestResult, emit_stdout_result, run_session_ingest
 from .settings import SettingsError, load_series_configs, load_settings
 from .runner import run_briefing
 from .utils import ensure_directory, slugify
@@ -32,6 +34,16 @@ def cli() -> int:
     init_parser.add_argument("--index", type=int, help="Select an upcoming event by 1-based index")
     init_parser.add_argument("--force", action="store_true", help="Overwrite an existing series file")
 
+    ingest_parser = subparsers.add_parser(
+        "session-ingest",
+        help="Ingest a completed noted session directory and write the post-meeting summary",
+    )
+    ingest_parser.add_argument(
+        "--session-dir",
+        required=True,
+        help="Path to the session directory produced by noted",
+    )
+
     args = parser.parse_args()
     try:
         settings = load_settings()
@@ -47,7 +59,34 @@ def cli() -> int:
         return _validate(settings)
     if args.command == "init-series":
         return _init_series(settings, args.event_uid, args.index, args.force)
+    if args.command == "session-ingest":
+        return _session_ingest(settings, args.session_dir)
     return 1
+
+
+def _session_ingest(settings, session_dir_arg: str) -> int:
+    session_dir = Path(session_dir_arg).expanduser()
+    if not session_dir.exists() or not session_dir.is_dir():
+        emit_stdout_result(
+            IngestResult(
+                ok=False,
+                exit_code=4,
+                session_id=None,
+                session_dir=str(session_dir),
+                decision=None,
+                note_path=None,
+                note_created=False,
+                block_written=False,
+                block_replaced=False,
+                terminal_status=None,
+                stop_reason=None,
+                error=f"session-dir not found or not a directory: {session_dir}",
+            )
+        )
+        return 4
+    result = run_session_ingest(settings, session_dir)
+    emit_stdout_result(result)
+    return result.exit_code
 
 
 def _validate(settings) -> int:

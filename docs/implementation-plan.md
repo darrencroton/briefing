@@ -92,18 +92,18 @@ Goal: `briefing session-ingest --session-dir <path>` reads `outputs/completion.j
 
 ### Tickets
 
-| Ticket | Title | Estimate | Dependencies | Acceptance notes |
-| --- | --- | ---: | --- | --- |
-| B-12 | Add completion reader and validator | 3 days | Pinned contracts | Reads completion first; validates schema and major version; exposes ingest decisions |
-| B-13 | Add completed-session model and loader | 3 days | B-12 | Resolves manifest, completion, transcript paths, `manifest.paths.note_path`, and briefing log path from one session directory; refuses to infer note path from filenames |
-| B-14 | Add transcript source adapter | 3 days | B-13 | Supports `transcript/transcript.txt` first; can read structured JSON later without changing prompt assembly shape |
-| B-15 | Add post-meeting prompt template | 3 days | B-14 | Includes transcript, manifest context, participant hints, attribution policy, and warnings |
-| B-16 | Implement post-meeting summary generator | 3 days | B-15 | Reuses existing LLM provider abstraction; emits debug prompt/output under configured debug paths when enabled |
-| B-17 | Add managed post-meeting summary block writer | 5 days | B-16 | Appends `## Meeting Summary` after `## Meeting Notes`; uses managed comments keyed by session id and transcript hash; preserves existing user text byte-for-byte; handles missing note creation safely |
-| B-18 | Implement partial-context policy | 2 days | B-12, B-17 | Lenient only for post-meeting failures; placeholder/log behavior matches section 27.5 |
-| B-19 | Add `briefing session-ingest` CLI | 3 days | B-12 through B-18 | `--session-dir`; stable exit codes; machine-readable success/failure result for `noted` logs |
-| B-20 | Add ingest fixture tests | 4 days | B-19 | Uses shared completion fixtures plus synthetic session dirs; verifies failed startup, failed capture, warning, and completed paths |
-| B-21 | Add real noted-session smoke handoff | 3 days | B-19 plus noted Phase 2 | Runs against a session produced by `noted`; verifies summary appended to the note |
+| Ticket | Status | Title | Estimate | Dependencies | Acceptance notes |
+| --- | --- | --- | ---: | --- | --- |
+| B-12 | Completed | Add completion reader and validator | 3 days | Pinned contracts | Reads completion first; validates schema and major version; exposes ingest decisions |
+| B-13 | Completed | Add completed-session model and loader | 3 days | B-12 | Resolves manifest, completion, transcript paths, `manifest.paths.note_path`, and briefing log path from one session directory; refuses to infer note path from filenames; validates completion/manifest identity |
+| B-14 | Completed | Add transcript source adapter | 3 days | B-13 | Supports `transcript/transcript.txt` first; can read structured JSON later without changing prompt assembly shape |
+| B-15 | Completed | Add post-meeting prompt template | 3 days | B-14 | Includes transcript, manifest context, participant hints, attribution policy, and warnings |
+| B-16 | Completed | Implement post-meeting summary generator | 3 days | B-15 | Reuses existing LLM provider abstraction; emits debug prompt/output under configured debug paths when enabled |
+| B-17 | Completed | Add managed post-meeting summary block writer | 5 days | B-16 | Appends `## Meeting Summary` after `## Meeting Notes`; uses managed comments keyed by session id and transcript hash; preserves existing user text byte-for-byte; creates missing notes through the configured note template |
+| B-18 | Completed | Implement partial-context policy | 2 days | B-12, B-17 | Lenient only for post-meeting failures; placeholder/log behavior matches section 27.5 |
+| B-19 | Completed | Add `briefing session-ingest` CLI | 3 days | B-12 through B-18 | `--session-dir`; stable exit codes; machine-readable success/failure result for `noted` logs, including invalid session directories |
+| B-20 | Completed | Add ingest fixture tests | 4 days | B-19 | Uses shared completion fixtures plus synthetic session dirs; verifies failed startup, failed capture, warning, completed paths, byte-preservation regressions, identity mismatch rejection, and CLI JSON failures |
+| B-21 | Blocked | Add real noted-session smoke handoff | 3 days | B-19 plus noted Phase 2 | Runbook exists. Real smoke attempted 2026-04-24 with the sibling `noted` build; `noted start --manifest /tmp/briefing-noted-smoke-codex/manifest.json` timed out while status remained `starting` / `acquiring_audio_resources`, so no `outputs/completion.json` was produced and `briefing session-ingest` could not verify a summary append from a real noted-produced session |
 
 Phase 4 ingestion focused estimate: 32 days.
 

@@ -29,6 +29,7 @@ name = "briefing"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pyobjc-framework-eventkit", marker = "sys_platform == 'darwin'" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -36,13 +37,12 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", extras = ["format-nongpl"], marker = "extra == 'dev'", specifier = ">=4.22,<5" },
+    { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.22,<5" },
     { name = "pyobjc-framework-eventkit", marker = "sys_platform == 'darwin'", specifier = ">=11.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.5,<9" },
     { name = "pyyaml", specifier = ">=6.0.2,<7" },
