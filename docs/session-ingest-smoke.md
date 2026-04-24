@@ -7,17 +7,11 @@ most of this.
 
 ## Current Status
 
-- Status: blocked, not complete.
-- Last attempt: 2026-04-24 using the sibling repo build at
-  `/Users/dcroton/Local/git-repos/dev/noted/HushScribe/.build/arm64-apple-macosx/debug/Noted`.
-- Scratch root: `/tmp/briefing-noted-smoke-codex`.
-- Result: `noted validate-manifest --manifest /tmp/briefing-noted-smoke-codex/manifest.json`
-  passed, but `noted start --manifest /tmp/briefing-noted-smoke-codex/manifest.json`
-  did not return within the bounded startup window. The session status remained
-  `starting` / `acquiring_audio_resources`, no `outputs/completion.json` was
-  produced, and `noted stop --session-id 2026-04-24T153000+1000-codex-smoke`
-  reported `session_not_running`.
-- No `Noted` process was left running after the attempt.
+- Status: **complete** — B-21 signed off 2026-04-24.
+- Session: `2026-04-24T171800+1000-slice-test`, scratch root `/tmp/noted-slice`.
+- Result: full chain passed — `noted start` (EXIT:0), `noted stop` (EXIT:0, audio_finalised), `completion.json` (terminal_status=completed, all *_ok=true), `briefing session-ingest` (EXIT:0, block_written=true). Guardrail #12 verified. No contract-level bugs found.
+- Earlier attempt (also 2026-04-24) blocked because the debug binary lacked bundle context for `app.noted.macos`; TCC's `requestAccess` blocked indefinitely. Resolution: use the dist app bundle and approve the mic permission dialog once after signing.
+- Full findings: see `docs/step-7-report.md` in the root repo.
 
 ## Prerequisites
 

@@ -22,14 +22,14 @@ When `briefing` runs (manually or via `launchd`), it:
 4. sends the context to an LLM CLI (`claude`, `codex`, `copilot`, or `gemini`)
 5. writes or refreshes the briefing block in the meeting note until the meeting starts
 
-If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside the managed briefing block.
+If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends a managed `## Meeting Summary` block with an LLM-generated post-meeting summary; re-running ingest replaces only that block.
 
 Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
 
 ## Current Capabilities
 
 - Python `3.13+` application managed with `uv`
-- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`
+- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-ingest`
 - Apple Calendar ingestion via EventKit
 - Explicit series configuration under `user_config/series/*.yaml`
 - Sources: `previous_note`, `slack`, `notion`, `file`, `email`
@@ -61,7 +61,7 @@ Supported LLM CLIs:
 
 This installs dependencies, creates the local runtime directories, bootstraps `user_config/settings.toml` if needed, and validates the configured LLM provider when possible.
 
-The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you want a different provider, edit `user_config/settings.toml` and rerun `./scripts/setup.sh`.
+The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you want a different provider, edit `user_config/settings.toml` and rerun `./scripts/setup.sh`. Note: model name format is provider-specific — the `claude` CLI expects dash-separated IDs (e.g. `claude-sonnet-4-5`), not dot-separated.
 
 ### 2. Edit `user_config/settings.toml`
 
@@ -148,7 +148,7 @@ Notes:
 - `effort` supports `low`, `medium`, `high`, or blank.
 - Existing local configs that still use `claude_cli` are normalized to `claude`.
 
-Example:
+Example for `copilot`:
 
 ```toml
 [llm]
@@ -162,6 +162,16 @@ temperature = 0.2
 max_output_tokens = 4096
 prompt_template = "pre_meeting_summary.md"
 note_template = "meeting_note.md"
+```
+
+Example for `claude` CLI (note: model IDs use dashes, not dots):
+
+```toml
+[llm]
+provider = "claude"
+command = ""
+model = "claude-sonnet-4-5"
+effort = "high"
 ```
 
 ## Source Model

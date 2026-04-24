@@ -22,8 +22,8 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 - Process only explicitly configured meeting series.
 - Match series with explicit rules, not title-only heuristics.
 - Keep occurrence state stable across event title changes.
-- Refresh only the managed pre-meeting summary block.
-- Never overwrite user-entered `Meeting Notes` or `Actions`.
+- Refresh only the managed `## Briefing` pre-meeting block (`briefing run`). Write and replace only the managed `## Meeting Summary` post-meeting block (`briefing session-ingest`).
+- Never touch user-owned content — `## Meeting Notes`, `Actions`, or any content between or after managed blocks.
 - Treat required source failures as blocking.
 - Prefer local-first operation and minimal moving parts.
 - Keep output as portable Markdown wherever practical, even when the default workflow is Obsidian-first.

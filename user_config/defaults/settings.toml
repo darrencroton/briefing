@@ -29,6 +29,8 @@ meeting_notes_placeholder = "- "
 provider = "copilot"
 # Optional executable override. Leave blank to use the provider default.
 command = ""
+# Model name format is provider-specific. copilot uses dot notation (claude-sonnet-4.6).
+# The claude CLI uses dash notation (e.g. claude-sonnet-4-5). Update when switching providers.
 model = "claude-sonnet-4.6"
 effort = "high"
 timeout_seconds = 600
