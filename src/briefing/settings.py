@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from .bootstrap import default_settings_path, local_settings_path
+from .coerce import optional_int as _optional_int, optional_str as _optional_str, parse_optional_bool
 from .models import (
     EmailSourceConfig,
     FileSourceConfig,
@@ -329,12 +330,6 @@ def _parse_slack_source(raw: Any) -> SlackSourceConfig | None:
     )
 
 
-def _optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    return int(value)
-
-
 def _parse_meeting_intelligence_settings(
     raw: Any,
     repo_root: Path,
@@ -371,13 +366,55 @@ def _parse_meeting_intelligence_settings(
         else meeting_notes_dir
     )
 
+    watch_poll = int(raw.get("watch_poll_seconds", 30))
+    if watch_poll < 5:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].watch_poll_seconds must be at least 5."
+        )
+
+    reschedule_tolerance = int(raw.get("reschedule_tolerance_seconds", 300))
+    if reschedule_tolerance < 0:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].reschedule_tolerance_seconds must be non-negative."
+        )
+
+    watch_lookahead = int(raw.get("watch_lookahead_minutes", 180))
+    if watch_lookahead < 1:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].watch_lookahead_minutes must be at least 1."
+        )
+
+    default_extension = int(raw.get("default_extension_minutes", 10))
+    if default_extension < 0:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].default_extension_minutes must be non-negative."
+        )
+
+    max_extension = int(raw.get("max_single_extension_minutes", 15))
+    if max_extension < 0:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].max_single_extension_minutes must be non-negative."
+        )
+
+    pre_end = int(raw.get("pre_end_prompt_minutes", 5))
+    if pre_end < 0:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].pre_end_prompt_minutes must be non-negative."
+        )
+
+    no_interaction = int(raw.get("no_interaction_grace_minutes", 5))
+    if no_interaction < 0:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].no_interaction_grace_minutes must be non-negative."
+        )
+
     return MeetingIntelligenceSettings(
         sessions_root=expand_path(str(raw.get("sessions_root", "sessions")), repo_root),
         noted_command=noted_command,
         pre_roll_seconds=pre_roll,
-        reschedule_tolerance_seconds=int(raw.get("reschedule_tolerance_seconds", 300)),
-        watch_poll_seconds=int(raw.get("watch_poll_seconds", 30)),
-        watch_lookahead_minutes=int(raw.get("watch_lookahead_minutes", 180)),
+        reschedule_tolerance_seconds=reschedule_tolerance,
+        watch_poll_seconds=watch_poll,
+        watch_lookahead_minutes=watch_lookahead,
         default_host_name=str(raw.get("default_host_name", "Meeting host")).strip() or "Meeting host",
         default_language=str(raw.get("default_language", "en-AU")).strip() or "en-AU",
         default_asr_backend=asr_backend,
@@ -390,10 +427,10 @@ def _parse_meeting_intelligence_settings(
         one_off_note_dir=one_off_note_dir,
         auto_start=_required_bool(raw.get("auto_start"), True, "[meeting_intelligence].auto_start"),
         auto_stop=_required_bool(raw.get("auto_stop"), True, "[meeting_intelligence].auto_stop"),
-        default_extension_minutes=int(raw.get("default_extension_minutes", 10)),
-        max_single_extension_minutes=int(raw.get("max_single_extension_minutes", 15)),
-        pre_end_prompt_minutes=int(raw.get("pre_end_prompt_minutes", 5)),
-        no_interaction_grace_minutes=int(raw.get("no_interaction_grace_minutes", 5)),
+        default_extension_minutes=default_extension,
+        max_single_extension_minutes=max_extension,
+        pre_end_prompt_minutes=pre_end,
+        no_interaction_grace_minutes=no_interaction,
     )
 
 
@@ -454,13 +491,6 @@ def _parse_recording_config(raw: Any) -> RecordingConfig:
     )
 
 
-def _optional_str(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
 def _optional_bool(value: Any) -> bool | None:
     if value is None:
         return None
@@ -474,16 +504,13 @@ def _required_bool(value: Any, default: bool, context: str) -> bool:
 
 
 def _bool_from_value(value: Any, context: str) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "yes", "y", "1", "on"}:
-            return True
-        if normalized in {"false", "no", "n", "0", "off"}:
-            return False
-        raise SettingsError(f"Invalid {context}: boolean value {value!r} is not recognized.")
-    raise SettingsError(f"Invalid {context}: expected a boolean value, got {value!r}.")
+    try:
+        result = parse_optional_bool(value)
+    except ValueError as exc:
+        raise SettingsError(f"Invalid {context}: {exc}.") from exc
+    if result is None:
+        raise SettingsError(f"Invalid {context}: expected a boolean value, got None.")
+    return result
 
 
 def _parse_llm_settings(raw: Any) -> dict[str, Any]:

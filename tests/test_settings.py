@@ -289,3 +289,61 @@ recording:
 
     with pytest.raises(SettingsError, match="boolean"):
         load_series_configs(app_settings)
+
+
+def _write_mi_settings(tmp_path: Path, overrides: dict) -> None:
+    """Write a minimal settings file with meeting_intelligence overrides applied."""
+    header = SETTINGS_HEADER
+    for key, value in overrides.items():
+        old = f"{key} = {_default_mi_value(key)}"
+        new = f"{key} = {value}"
+        header = header.replace(old, new)
+    (tmp_path / "user_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "user_config" / "settings.toml").write_text(
+        f"{header}\n\n[llm]\n"
+        "provider = \"codex\"\n"
+        "command = \"\"\n"
+        "model = \"gpt-5.4\"\n"
+        "effort = \"medium\"\n"
+        "timeout_seconds = 600\n"
+        "retry_attempts = 3\n"
+        "temperature = 0.2\n"
+        "max_output_tokens = 4096\n"
+        "prompt_template = \"pre_meeting_summary.md\"\n"
+        "note_template = \"meeting_note.md\"\n",
+        encoding="utf-8",
+    )
+
+
+def _default_mi_value(key: str) -> str:
+    defaults = {
+        "watch_poll_seconds": "30",
+        "reschedule_tolerance_seconds": "300",
+        "watch_lookahead_minutes": "180",
+        "default_extension_minutes": "10",
+        "max_single_extension_minutes": "15",
+        "pre_end_prompt_minutes": "5",
+        "no_interaction_grace_minutes": "5",
+    }
+    return defaults[key]
+
+
+@pytest.mark.parametrize(
+    "key, bad_value, match_text",
+    [
+        ("watch_poll_seconds", "0", "watch_poll_seconds"),
+        ("watch_poll_seconds", "4", "watch_poll_seconds"),
+        ("reschedule_tolerance_seconds", "-1", "reschedule_tolerance_seconds"),
+        ("watch_lookahead_minutes", "0", "watch_lookahead_minutes"),
+        ("default_extension_minutes", "-1", "default_extension_minutes"),
+        ("max_single_extension_minutes", "-1", "max_single_extension_minutes"),
+        ("pre_end_prompt_minutes", "-1", "pre_end_prompt_minutes"),
+        ("no_interaction_grace_minutes", "-1", "no_interaction_grace_minutes"),
+    ],
+)
+def test_load_settings_rejects_out_of_bounds_integer_settings(
+    tmp_path: Path, key: str, bad_value: str, match_text: str
+) -> None:
+    _write_mi_settings(tmp_path, {key: bad_value})
+    with pytest.raises(SettingsError, match=match_text):
+        load_settings(tmp_path)

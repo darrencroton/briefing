@@ -12,11 +12,14 @@ PATH_VALUE="${PATH}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sb
 
 mkdir -p "${OUTPUT_DIR}" "${LOG_DIR}"
 
+# Escape & and \ so they are not misinterpreted as sed replacement metacharacters
+sed_escape() { printf '%s\n' "$1" | sed 's/[\\&]/\\&/g'; }
+
 sed \
-  -e "s|{{UV_PATH}}|${UV_PATH}|g" \
-  -e "s|{{REPO_ROOT}}|${REPO_ROOT}|g" \
-  -e "s|{{LOG_DIR}}|${LOG_DIR}|g" \
-  -e "s|{{PATH_VALUE}}|${PATH_VALUE}|g" \
+  -e "s|{{UV_PATH}}|$(sed_escape "${UV_PATH}")|g" \
+  -e "s|{{REPO_ROOT}}|$(sed_escape "${REPO_ROOT}")|g" \
+  -e "s|{{LOG_DIR}}|$(sed_escape "${LOG_DIR}")|g" \
+  -e "s|{{PATH_VALUE}}|$(sed_escape "${PATH_VALUE}")|g" \
   "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"
 
 echo "Rendered ${OUTPUT_PATH}"

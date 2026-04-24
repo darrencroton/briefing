@@ -16,6 +16,7 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .calendar import EventKitClient
+from .coerce import optional_int as _optional_int, optional_str as _optional_str, parse_optional_bool
 from .matching import match_series
 from .models import MeetingEvent, RecordingConfig, RecordingPolicyConfig, SeriesConfig, SessionPlanState
 from .runner import build_output_filename
@@ -291,18 +292,19 @@ def plan_event(
                 skip_reason=None,
             )
 
-    next_event, next_result = _prewrite_next_manifest(settings, event, events, series_configs, now, store)
-    manifest = assemble_manifest(
-        settings=settings,
-        eligibility=eligibility,
-        created_at=now,
-        next_event=next_event,
-        next_manifest_path=next_result.manifest_path if next_result else None,
-    )
+    # Write primary manifest first so that a failure here commits nothing
+    manifest = assemble_manifest(settings=settings, eligibility=eligibility, created_at=now)
     manifest_path = write_manifest(settings, manifest)
-
-    plan_state = _plan_state_from_manifest(settings, event, manifest, manifest_path, now)
+    plan_state = _plan_state_from_manifest(store, event, manifest, manifest_path, now)
     store.save_session_plan(plan_state)
+
+    # Prewrite next manifest now that primary is safely on disk; patch primary if a next exists
+    next_event, next_result = _prewrite_next_manifest(settings, event, events, series_configs, now, store)
+    if next_event is not None:
+        manifest["next_meeting"] = _next_meeting(next_event, next_result.manifest_path if next_result else None)
+        _validate_manifest_payload(manifest, manifest_path)
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
     return SessionPlanResult(
         ok=True,
         status="planned",
@@ -491,7 +493,7 @@ def _prewrite_next_manifest(
             )
             continue
         state_store.save_session_plan(
-            _plan_state_from_manifest(settings, candidate, manifest, manifest_path, now)
+            _plan_state_from_manifest(state_store, candidate, manifest, manifest_path, now)
         )
         return candidate, SessionPlanResult(
             ok=True,
@@ -561,13 +563,12 @@ def refresh_active_next_meeting_manifests(
 
 
 def _plan_state_from_manifest(
-    settings: AppSettings,
+    store: StateStore,
     event: MeetingEvent,
     manifest: dict[str, Any],
     manifest_path: Path,
     now: datetime,
 ) -> SessionPlanState:
-    store = StateStore(settings)
     return SessionPlanState(
         occurrence_key=store.occurrence_key(event),
         event_uid=event.uid,
@@ -850,6 +851,7 @@ def _rewrite_plan_for_reschedule(
             plan,
             occurrence_key=store.occurrence_key(event),
             start_iso=event.start.isoformat(),
+            note_path=str(manifest["paths"]["note_path"]),
             planned_at=now.isoformat(),
         )
     )
@@ -866,27 +868,8 @@ def _choose(first: Any, second: Any) -> Any:
     return first if first is not None else second
 
 
-def _optional_str(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
-def _optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    return int(value)
-
-
 def _optional_bool(value: Any) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in {"true", "yes", "y", "1", "on"}:
-        return True
-    if text in {"false", "no", "n", "0", "off"}:
-        return False
-    raise PlanningError(f"Invalid boolean value in noted config: {value!r}")
+    try:
+        return parse_optional_bool(value)
+    except ValueError as exc:
+        raise PlanningError(f"Invalid boolean value in noted config: {exc}") from exc

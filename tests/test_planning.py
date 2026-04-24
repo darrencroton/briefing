@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from unittest.mock import patch
+
 from briefing.models import MeetingEvent, RecordingConfig
 from briefing.planning import (
     PlanningError,
@@ -455,6 +457,48 @@ def test_invalidation_sweep_rewrites_in_tolerance_reschedule_in_place(app_settin
     assert rewritten["session_id"] == original_session_id
     assert rewritten["meeting"]["start_time"] == "2026-04-13T10:02:00+10:00"
     assert rewritten["paths"]["session_dir"] == str(original_path.parent)
+    # State store note_path must match the manifest after reschedule crosses a minute boundary
+    plans = StateStore(app_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].note_path == rewritten["paths"]["note_path"]
+
+
+def test_plan_event_no_orphaned_state_when_primary_write_fails(app_settings) -> None:
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+        },
+    )
+    _write_series(
+        app_settings,
+        {
+            "series_id": "ops-review",
+            "display_name": "Ops Review",
+            "note_slug": "ops-review",
+            "match": {"title_any": ["Ops Review"]},
+        },
+    )
+    first = _event()
+    second = _event(uid="event-2", title="Ops Review", start="2026-04-13T11:30:00+10:00")
+
+    def _fail_write(settings, manifest):
+        raise PlanningError("simulated disk failure")
+
+    with patch("briefing.planning.write_manifest", side_effect=_fail_write):
+        with pytest.raises(PlanningError, match="simulated disk failure"):
+            plan_event(
+                app_settings,
+                first,
+                events=[first, second],
+                now=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+            )
+
+    assert StateStore(app_settings).list_session_plans() == []
+    assert not list(app_settings.meeting_intelligence.sessions_root.glob("*/manifest.json"))
 
 
 def test_invalidation_sweep_preserves_next_manifest_on_in_tolerance_reschedule(app_settings) -> None:

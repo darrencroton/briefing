@@ -45,6 +45,7 @@ def run_watch(
     exit_code = 0
 
     while True:
+        exit_code = 0
         now = now_provider()
         try:
             fetch_start = now - timedelta(days=1)
