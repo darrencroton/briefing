@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://briefing-noted-contracts/schemas/manifest.v1.json",
+  "title": "Session Manifest",
+  "description": "Manifest handoff from briefing (or noted, for ad hoc) to noted for one meeting instance. Authoritative shape is the master plan §8. Once written, a manifest must not be modified; runtime state lives in separate files.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "session_id",
+    "created_at",
+    "meeting",
+    "mode",
+    "participants",
+    "recording_policy",
+    "next_meeting",
+    "paths",
+    "transcription"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "description": "Major.minor version of this manifest payload. Readers pinned to major 1 accept any 1.x payload; forward-tolerate minor (unknown fields ignored). Enforced as a major-1 pattern rather than a const so a 1.0 reader does not reject a 1.1 payload at schema-validation time (see `contracts/versioning-policy.md`).",
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "session_id": {
+      "description": "Unique session identifier. Used as the session directory name.",
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "description": "Time the manifest was written. ISO-8601 with explicit timezone offset.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "meeting": {
+      "type": "object",
+      "required": ["event_id", "title", "start_time", "scheduled_end_time", "timezone"],
+      "additionalProperties": true,
+      "properties": {
+        "event_id": {
+          "description": "Calendar event identifier. Null only for ad hoc sessions (§20.1).",
+          "type": ["string", "null"]
+        },
+        "series_id": {
+          "description": "Matching briefing series, if any. Absent for ad hoc sessions.",
+          "type": "string"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "start_time": {
+          "description": "Scheduled meeting start. ISO-8601 with explicit timezone offset.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+        },
+        "scheduled_end_time": {
+          "description": "Scheduled meeting end. ISO-8601 with offset. Null only for ad hoc sessions (§20.1); end-of-meeting popup logic is suppressed in that case.",
+          "type": ["string", "null"],
+          "format": "date-time",
+          "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+        },
+        "timezone": {
+          "description": "IANA timezone name (e.g. Australia/Melbourne).",
+          "type": "string",
+          "minLength": 1
+        },
+        "location": { "type": "string" }
+      }
+    },
+    "mode": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "enum": ["in_person", "online", "hybrid"]
+        },
+        "audio_strategy": {
+          "description": "Capture strategy. If absent, noted derives it from mode.type per §14.1.",
+          "enum": ["room_mic", "mic_plus_system"]
+        }
+      }
+    },
+    "participants": {
+      "type": "object",
+      "required": ["host_name", "names_are_hints_only"],
+      "additionalProperties": true,
+      "properties": {
+        "host_name": { "type": "string", "minLength": 1 },
+        "attendees_expected": { "type": "integer", "minimum": 1 },
+        "participant_names": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "names_are_hints_only": {
+          "description": "Locked to true. Participant names are soft hints only (guardrail 7; master plan §16.4). Producers must emit true; readers must refuse anything else.",
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "recording_policy": {
+      "type": "object",
+      "required": [
+        "auto_start",
+        "auto_stop",
+        "default_extension_minutes",
+        "pre_end_prompt_minutes",
+        "no_interaction_grace_minutes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "auto_start": { "type": "boolean" },
+        "auto_stop": { "type": "boolean" },
+        "default_extension_minutes": { "type": "integer", "minimum": 0 },
+        "max_single_extension_minutes": {
+          "description": "Reserved in v1.0 (master plan §8.3) for future extension policy (§27.12). Writers may populate; noted v1 ignores.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "pre_end_prompt_minutes": { "type": "integer", "minimum": 0 },
+        "no_interaction_grace_minutes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "next_meeting": {
+      "type": "object",
+      "required": ["exists"],
+      "additionalProperties": true,
+      "properties": {
+        "exists": { "type": "boolean" },
+        "event_id": { "type": "string" },
+        "title": { "type": "string" },
+        "start_time": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+        },
+        "manifest_path": {
+          "description": "Absolute path to the pre-prepared next manifest. briefing writes this in advance; noted switch-next invokes noted start on it directly. Expected to be present when exists=true; absence is tolerated (switch-next will then return exit 3 or 8).",
+          "type": "string"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "required": ["session_dir", "output_dir", "note_path"],
+      "additionalProperties": true,
+      "properties": {
+        "session_dir": { "type": "string", "minLength": 1 },
+        "output_dir": { "type": "string", "minLength": 1 },
+        "note_path": {
+          "description": "Target Obsidian note path. This is the only path outside session_dir that components are permitted to write (§11.4).",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "transcription": {
+      "type": "object",
+      "required": ["asr_backend", "diarization_enabled"],
+      "additionalProperties": true,
+      "properties": {
+        "asr_backend": {
+          "description": "On-device Swift ASR backend. Locked for v1 per §15.2 and §27.9. Python backends (faster-whisper, whisperx) are not permitted.",
+          "enum": ["whisperkit", "fluidaudio-parakeet", "sfspeech"]
+        },
+        "diarization_enabled": { "type": "boolean" },
+        "speaker_count_hint": {
+          "description": "Advisory only. May be derived by briefing from attendees_expected or participant_names per §8.5.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "language": {
+          "description": "BCP-47 language tag (e.g. en-AU). If absent, noted uses its configured default.",
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "completion_callback": {
+          "description": "Reserved for a future per-session completion callback. Must be null in v1.0. See §8.3 and §27.6: completion handoff is performed by noted invoking `briefing session-ingest <session-dir>` directly.",
+          "type": "null"
+        }
+      }
+    }
+  }
+}

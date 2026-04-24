@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "jsonschema[format-nongpl]>=4.22,<5",
   "pytest>=8.3.5,<9",
 ]
 
@@ -28,4 +29,3 @@ packages = ["src/briefing"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
-

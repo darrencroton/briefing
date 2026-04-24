@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "session_id": "2026-04-24T093000+1000-naive-timestamp",
+  "created_at": "2026-04-24T08:45:00",
+  "meeting": {
+    "event_id": "calendar-event-invalid-2",
+    "series_id": "product-review-weekly",
+    "title": "Naive timestamp example",
+    "start_time": "2026-04-24T09:30:00",
+    "scheduled_end_time": "2026-04-24T10:00:00+10:00",
+    "timezone": "Australia/Melbourne",
+    "location": "Conference Room 3B"
+  },
+  "mode": {
+    "type": "in_person",
+    "audio_strategy": "room_mic"
+  },
+  "participants": {
+    "host_name": "Alex Chen",
+    "attendees_expected": 5,
+    "participant_names": [
+      "Alex Chen",
+      "Priya Shah"
+    ],
+    "names_are_hints_only": true
+  },
+  "recording_policy": {
+    "auto_start": true,
+    "auto_stop": true,
+    "default_extension_minutes": 10,
+    "pre_end_prompt_minutes": 5,
+    "no_interaction_grace_minutes": 5
+  },
+  "next_meeting": {
+    "exists": false
+  },
+  "paths": {
+    "session_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T093000+1000-naive-timestamp",
+    "output_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T093000+1000-naive-timestamp/outputs",
+    "note_path": "/tmp/meeting-intelligence/vault/Meetings/Naive Timestamp/2026-04-24.md"
+  },
+  "transcription": {
+    "asr_backend": "fluidaudio-parakeet",
+    "diarization_enabled": true,
+    "speaker_count_hint": 5,
+    "language": "en-AU"
+  },
+  "hooks": {
+    "completion_callback": null
+  }
+}

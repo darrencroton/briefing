@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://briefing-noted-contracts/schemas/runtime-status.v1.json",
+  "title": "Session Runtime Status File",
+  "description": "Machine-readable session runtime state at <session_dir>/runtime/status.json (§10.3). Rewritten by noted on every state or phase transition. Exists so briefing or a crash investigator can inspect state without relying on the CLI or a running process. This file carries no schema_version field — the version is encoded in its filename, matching the master-plan example at §10.3.",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "phase",
+    "updated_at"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "description": "Top-level session state. Locked vocabulary per §10.1.",
+      "enum": [
+        "idle",
+        "starting",
+        "recording",
+        "stopping",
+        "processing",
+        "completed",
+        "completed_with_warnings",
+        "failed"
+      ]
+    },
+    "phase": {
+      "description": "Finer-grained indicator within status. Locked vocabulary per §10.2.",
+      "enum": [
+        "validating_manifest",
+        "acquiring_audio_resources",
+        "capturing",
+        "flushing_audio",
+        "running_asr",
+        "running_diarization",
+        "writing_outputs",
+        "finished",
+        "failed_startup",
+        "failed_capture",
+        "failed_processing"
+      ]
+    },
+    "started_at": {
+      "description": "When capture actually began (moment of the recording-start bell). Null before capture starts.",
+      "type": ["string", "null"],
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "updated_at": {
+      "description": "When this status record was last written. ISO-8601 with explicit timezone offset.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "scheduled_end_time": {
+      "description": "Echoed from the manifest, reflecting any active extension. Null for ad hoc sessions with no scheduled end.",
+      "type": ["string", "null"],
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "current_extension_minutes": {
+      "description": "Total minutes added by +5 presses in this session.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "pre_end_prompt_shown": { "type": "boolean" },
+    "last_error": {
+      "description": "Short human-readable description of the most recent error, if any.",
+      "type": ["string", "null"]
+    }
+  }
+}

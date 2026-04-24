@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "session_id": "2026-04-24T093000+1000-weekly-product-review",
+  "manifest_schema_version": "1.0",
+  "terminal_status": "completed",
+  "stop_reason": "scheduled_stop",
+  "audio_capture_ok": true,
+  "transcript_ok": true,
+  "diarization_ok": true,
+  "warnings": [],
+  "errors": [],
+  "completed_at": "2026-04-24T10:01:12+10:00"
+}

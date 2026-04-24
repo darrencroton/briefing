@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "session_id": "2026-04-24T140000+1000-customer-sync",
+  "created_at": "2026-04-24T13:40:00+10:00",
+  "meeting": {
+    "event_id": "calendar-event-2c5a8e41",
+    "series_id": "customer-sync-acme",
+    "title": "ACME Customer Sync",
+    "start_time": "2026-04-24T14:00:00+10:00",
+    "scheduled_end_time": "2026-04-24T14:30:00+10:00",
+    "timezone": "Australia/Melbourne",
+    "location": "https://meet.example.invalid/acme-sync"
+  },
+  "mode": {
+    "type": "online",
+    "audio_strategy": "mic_plus_system"
+  },
+  "participants": {
+    "host_name": "Jamie Rivera",
+    "attendees_expected": 4,
+    "participant_names": [
+      "Jamie Rivera",
+      "Riley Brooks",
+      "Casey Nguyen",
+      "Taylor Morgan"
+    ],
+    "names_are_hints_only": true
+  },
+  "recording_policy": {
+    "auto_start": true,
+    "auto_stop": true,
+    "default_extension_minutes": 10,
+    "max_single_extension_minutes": 15,
+    "pre_end_prompt_minutes": 5,
+    "no_interaction_grace_minutes": 5
+  },
+  "next_meeting": {
+    "exists": true,
+    "event_id": "calendar-event-66b98a24",
+    "title": "Engineering Standup",
+    "start_time": "2026-04-24T14:30:00+10:00",
+    "manifest_path": "/tmp/meeting-intelligence/manifests/2026-04-24T143000+1000-engineering-standup.json"
+  },
+  "paths": {
+    "session_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T140000+1000-customer-sync",
+    "output_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T140000+1000-customer-sync/outputs",
+    "note_path": "/tmp/meeting-intelligence/vault/Meetings/ACME Customer Sync/2026-04-24.md"
+  },
+  "transcription": {
+    "asr_backend": "whisperkit",
+    "diarization_enabled": true,
+    "speaker_count_hint": 4,
+    "language": "en-AU"
+  },
+  "hooks": {
+    "completion_callback": null
+  }
+}

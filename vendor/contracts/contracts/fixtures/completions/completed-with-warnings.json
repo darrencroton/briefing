@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "session_id": "2026-04-24T140000+1000-customer-sync",
+  "manifest_schema_version": "1.0",
+  "terminal_status": "completed_with_warnings",
+  "stop_reason": "scheduled_stop",
+  "audio_capture_ok": true,
+  "transcript_ok": true,
+  "diarization_ok": false,
+  "warnings": [
+    "diarization_failed"
+  ],
+  "errors": [],
+  "completed_at": "2026-04-24T14:31:45+10:00"
+}

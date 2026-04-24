@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "session_id": "2026-04-24T111500+1000-adhoc-room-capture",
+  "created_at": "2026-04-24T11:15:00+10:00",
+  "meeting": {
+    "event_id": null,
+    "title": "Ad hoc room capture",
+    "start_time": "2026-04-24T11:15:00+10:00",
+    "scheduled_end_time": null,
+    "timezone": "Australia/Melbourne",
+    "location": "Conference Room 1A"
+  },
+  "mode": {
+    "type": "in_person",
+    "audio_strategy": "room_mic"
+  },
+  "participants": {
+    "host_name": "Manual Operator",
+    "attendees_expected": 1,
+    "participant_names": [
+      "Manual Operator"
+    ],
+    "names_are_hints_only": true
+  },
+  "recording_policy": {
+    "auto_start": false,
+    "auto_stop": false,
+    "default_extension_minutes": 0,
+    "pre_end_prompt_minutes": 0,
+    "no_interaction_grace_minutes": 0
+  },
+  "next_meeting": {
+    "exists": false
+  },
+  "paths": {
+    "session_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T111500+1000-adhoc-room-capture",
+    "output_dir": "/tmp/meeting-intelligence/sessions/2026-04-24T111500+1000-adhoc-room-capture/outputs",
+    "note_path": "/tmp/meeting-intelligence/vault/Meetings/Ad hoc/2026-04-24-1115.md"
+  },
+  "transcription": {
+    "asr_backend": "sfspeech",
+    "diarization_enabled": false,
+    "language": "en-AU"
+  },
+  "hooks": {
+    "completion_callback": null
+  }
+}
