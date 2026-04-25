@@ -39,7 +39,7 @@ Only meetings you have explicitly configured are processed. If a required source
 - Local state and diagnostics under `state/`
 - `launchd` helper scripts for unattended batch and watcher runs
 
-Remaining Meeting Intelligence polish:
+Completed Meeting Intelligence polish:
 
 - automatic `noted` ingest handoff from the capture agent
 - cross-boundary diagnostics and formal smoke script/runbook
@@ -151,6 +151,19 @@ To inspect a single manifest plan:
 
 ```bash
 uv run briefing session-plan --event-id "EVENT-UID-HERE"
+```
+
+After a `noted` session finishes, `noted` normally invokes ingest automatically. Operators can still inspect or rerun the handoff manually:
+
+```bash
+uv run briefing session-ingest --session-dir /path/to/session --dry-run
+uv run briefing session-ingest --session-dir /path/to/session
+```
+
+The repeatable local smoke harness is:
+
+```bash
+scripts/meeting-intelligence-smoke.sh
 ```
 
 ## LLM Configuration

@@ -33,10 +33,10 @@ Completed:
 
 Remaining before Phase 5 hardening:
 
-- Integration polish: B-22 through B-25.
+- Integration polish B-22 through B-25 is complete.
 - Phase 5 should still wait for real operational data from the completed Phase 2-4 flows.
 
-Local verification on 2026-04-25: `uv run pytest` passes with 180 tests.
+Local verification on 2026-04-25: `uv run pytest` passes with 182 tests.
 
 ## Cross-Repo Dependency Map
 
@@ -155,12 +155,12 @@ Goal: The team can demonstrate one calendar-driven in-person meeting flowing thr
 
 ### Tickets
 
-| Ticket | Title | Estimate | Dependencies | Acceptance notes |
-| --- | --- | ---: | --- | --- |
-| B-22 | Add cross-boundary diagnostics | 2 days | B-09, B-19 | Stable log fields for event uid, session id, manifest path, noted exit code, completion status |
-| B-23 | Add operator dry-run modes | 3 days | B-08, B-19 | Plan without launching; ingest without writing note; useful for review and debugging |
-| B-24 | Build first vertical-slice script/runbook | 2 days | B-21, noted Phase 2 | Owns the cross-repo Step 7 smoke script, preferably under `briefing/scripts/`; documents exact commands and expected artefacts |
-| B-25 | Update user docs for recording workflow | 3 days | B-11, B-19 | Adds `briefing watch`, `session-plan`, and `session-ingest` usage without disrupting existing pre-meeting docs |
+| Ticket | Status | Title | Estimate | Dependencies | Acceptance notes |
+| --- | --- | --- | ---: | --- | --- |
+| B-22 | Completed | Add cross-boundary diagnostics | 2 days | B-09, B-19 | Stable log fields for event uid, session id, manifest path, noted exit code, completion status |
+| B-23 | Completed | Add operator dry-run modes | 3 days | B-08, B-19 | Plan without launching; ingest without writing note; useful for review and debugging |
+| B-24 | Completed | Build first vertical-slice script/runbook | 2 days | B-21, noted Phase 2 | Owns the cross-repo Step 7 smoke script, preferably under `briefing/scripts/`; documents exact commands and expected artefacts |
+| B-25 | Completed | Update user docs for recording workflow | 3 days | B-11, B-19 | Adds `briefing watch`, `session-plan`, and `session-ingest` usage without disrupting existing pre-meeting docs |
 
 Integration polish focused estimate: 10 days.
 
@@ -184,18 +184,18 @@ The first vertical slice and planning/watch work are complete:
 - Real noted-session handoff: B-21.
 - Calendar planning/watch: B-01 through B-11.
 
-The next development team should start with polish, not the original bring-up slice:
+Phase 4 integration polish completed 2026-04-25:
 
-- B-22 cross-boundary diagnostics.
-- B-23 operator dry-run modes, including ingest without writing a note.
-- B-24 formal repeatable smoke script/runbook.
-- B-25 user docs for the full recording workflow.
+- **B-22** — Watch and ingest now emit stable structured boundary logs for event uid, session id, manifest path, noted exit code, completion status, and note-write result.
+- **B-23** — `briefing session-ingest --dry-run` exercises completion, manifest, transcript, prompt, and summary generation without writing the note. `briefing watch --once --dry-run` remains the launch-safe planner dry-run.
+- **B-24** — `scripts/meeting-intelligence-smoke.sh` formalises the cross-repo smoke path from fixture manifest to `noted` capture, completion, dry-run ingest, and real ingest.
+- **B-25** — README, setup walkthrough, and smoke runbook now document `watch`, `session-plan`, `session-ingest`, dry-runs, and the automatic `noted` handoff.
 
 ## Highest-Risk Assumptions
 
 - The existing note refresh logic can append a new managed summary block after user notes while preserving user content byte-for-byte. **Proved in B-17 tests and Step 7.**
 - `briefing watch` can be long-running enough for pre-roll and invalidation without destabilizing the existing batch `run` command. **Covered by watch tests; real operational soak still pending.**
-- One-off `noted config` events can be given sensible defaults without forcing users to create series YAML for every recording. **Implemented for planning; ad hoc canonical Start in `noted` is still N-23.**
+- One-off `noted config` events can be given sensible defaults without forcing users to create series YAML for every recording. **Implemented for planning; ad hoc canonical Start in `noted` is complete in N-23.**
 - The first useful transcript summary can reuse the current LLM provider abstraction without a separate provider path. **Implemented in B-16 and exercised by Step 7.**
 
 ## Review Questions

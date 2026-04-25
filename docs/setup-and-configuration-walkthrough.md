@@ -144,6 +144,14 @@ To dry-run the long-lived recorder planner without launching `noted`:
 uv run briefing watch --once --dry-run
 ```
 
+To inspect a completed `noted` session before writing the managed summary block:
+
+```bash
+uv run briefing session-ingest --session-dir /path/to/noted/session --dry-run
+```
+
+When ready, run the same command without `--dry-run`. In normal operation this handoff is automatic: after `outputs/completion.json` is written, `noted` invokes `briefing session-ingest --session-dir <session_dir>` and stores stdout/stderr under the session `logs/` directory.
+
 ## LLM provider setup
 
 `briefing` is CLI-only. It supports these provider values in `[llm]`:

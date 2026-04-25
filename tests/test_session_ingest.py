@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -398,6 +399,45 @@ def test_ingest_completed_writes_summary_block(app_settings, tmp_path: Path) -> 
     assert (fx.session_dir / "logs" / "briefing.log").exists()
 
 
+def test_ingest_boundary_logs_include_manifest_identity(
+    app_settings,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+    provider = StubProvider()
+
+    with caplog.at_level(logging.INFO, logger="briefing.session.ingest"):
+        result = run_session_ingest(app_settings, fx.session_dir, provider=provider)
+
+    assert result.ok
+    payloads: dict[str, dict[str, object]] = {}
+    for record in caplog.records:
+        message = record.getMessage()
+        if not message.startswith("boundary="):
+            continue
+        boundary, payload = message.split(" ", 1)
+        payloads[boundary.removeprefix("boundary=")] = json.loads(payload)
+
+    for boundary in ("session_ingest_decision", "note_write"):
+        assert payloads[boundary]["event_id"] == "calendar-event-7d9f2a1b"
+        assert payloads[boundary]["series_id"] == "product-review-weekly"
+
+
+def test_ingest_dry_run_generates_summary_without_writing_note(app_settings, tmp_path: Path) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+    provider = StubProvider()
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=provider, dry_run=True)
+
+    assert result.ok
+    assert result.dry_run is True
+    assert result.block_written is False
+    assert result.note_created is False
+    assert provider.prompts and "Transcript:" in provider.prompts[0]
+    assert not fx.note_path.exists()
+
+
 def test_ingest_completed_with_warnings_uses_speaker_agnostic_attribution(
     app_settings, tmp_path: Path
 ) -> None:
@@ -513,5 +553,6 @@ def test_session_ingest_cli_bad_session_dir_emits_machine_readable_json(
     assert captured.err == ""
     assert payload["ok"] is False
     assert payload["exit_code"] == 4
+    assert payload["dry_run"] is False
     assert payload["session_dir"] == str(missing_session_dir)
     assert "session-dir not found" in payload["error"]

@@ -145,6 +145,22 @@ def _plan_and_maybe_launch(
             ["start", "--manifest", result.manifest_path],
             result.session_dir,
         )
+        logger.info(
+            "boundary=%s %s",
+            "noted_start_dry_run",
+            json.dumps(
+                {
+                    "event_uid": event.uid,
+                    "session_id": result.session_id,
+                    "manifest_path": result.manifest_path,
+                    "session_dir": result.session_dir,
+                    "command": settings.meeting_intelligence.noted_command,
+                    "args": ["start", "--manifest", result.manifest_path],
+                    "dry_run": True,
+                },
+                sort_keys=True,
+            ),
+        )
         return
 
     command = [settings.meeting_intelligence.noted_command, "start", "--manifest", result.manifest_path]
@@ -168,6 +184,25 @@ def _plan_and_maybe_launch(
                 "stdout": completed.stdout.strip(),
                 "stderr": completed.stderr.strip(),
                 "plan": asdict(updated),
+            },
+            sort_keys=True,
+        ),
+    )
+    logger.info(
+        "boundary=%s %s",
+        "noted_start",
+        json.dumps(
+            {
+                "event_uid": event.uid,
+                "session_id": result.session_id,
+                "manifest_path": result.manifest_path,
+                "session_dir": result.session_dir,
+                "command": command[0],
+                "args": command[1:],
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout.strip(),
+                "stderr": completed.stderr.strip(),
+                "plan_status": updated.status,
             },
             sort_keys=True,
         ),

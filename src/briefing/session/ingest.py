@@ -72,6 +72,7 @@ class IngestResult:
     terminal_status: str | None
     stop_reason: str | None
     error: str | None = None
+    dry_run: bool = False
 
     def as_stdout_payload(self) -> dict[str, object]:
         return {
@@ -87,6 +88,7 @@ class IngestResult:
             "terminal_status": self.terminal_status,
             "stop_reason": self.stop_reason,
             "error": self.error,
+            "dry_run": self.dry_run,
         }
 
 
@@ -95,6 +97,7 @@ def run_session_ingest(
     session_dir: Path,
     *,
     provider=None,
+    dry_run: bool = False,
 ) -> IngestResult:
     """Run the full session-ingest flow against one session directory."""
     session_dir = session_dir.resolve()
@@ -106,7 +109,7 @@ def run_session_ingest(
         LOGGER.warning("Could not attach session log handler (%s): %s", session_log_path, exc)
 
     try:
-        return _run(settings, session_dir, provider=provider)
+        return _run(settings, session_dir, provider=provider, dry_run=dry_run)
     finally:
         if session_handler is not None:
             logging.getLogger().removeHandler(session_handler)
@@ -118,15 +121,16 @@ def _run(
     session_dir: Path,
     *,
     provider=None,
+    dry_run: bool = False,
 ) -> IngestResult:
-    LOGGER.info("Starting session ingest for %s", session_dir)
+    LOGGER.info("Starting session ingest for %s dry_run=%s", session_dir, dry_run)
 
     # Step 1: completion.json first. Never infer from file presence.
     try:
         completion = read_completion(session_dir)
     except CompletionError as exc:
         LOGGER.error("Completion read failed: %s", exc)
-        return _error_result(session_dir, exc.exit_code, str(exc))
+        return _error_result(session_dir, exc.exit_code, str(exc), dry_run=dry_run)
 
     LOGGER.info(
         "Completion loaded: session_id=%s terminal_status=%s stop_reason=%s "
@@ -137,6 +141,23 @@ def _run(
         completion.audio_capture_ok,
         completion.transcript_ok,
         completion.diarization_ok,
+    )
+    LOGGER.info(
+        "boundary=%s %s",
+        "completion_loaded",
+        json.dumps(
+            {
+                "session_id": completion.session_id,
+                "session_dir": str(session_dir),
+                "terminal_status": completion.terminal_status,
+                "stop_reason": completion.stop_reason,
+                "audio_capture_ok": completion.audio_capture_ok,
+                "transcript_ok": completion.transcript_ok,
+                "diarization_ok": completion.diarization_ok,
+                "dry_run": dry_run,
+            },
+            sort_keys=True,
+        ),
     )
 
     # Step 2: load manifest.
@@ -151,10 +172,32 @@ def _run(
             session_id=completion.session_id,
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
 
     decision = decide(completion)
+    manifest_context = {
+        "event_id": loaded.manifest.event_id,
+        "series_id": loaded.manifest.series_id,
+    }
     LOGGER.info("Ingest decision: %s", decision.value)
+    LOGGER.info(
+        "boundary=%s %s",
+        "session_ingest_decision",
+        json.dumps(
+            {
+                "session_id": completion.session_id,
+                "session_dir": str(session_dir),
+                "manifest_path": str(loaded.manifest_path),
+                "note_path": str(loaded.note_path),
+                **manifest_context,
+                "decision": decision.value,
+                "terminal_status": completion.terminal_status,
+                "dry_run": dry_run,
+            },
+            sort_keys=True,
+        ),
+    )
 
     # Step 3: partial-context policy (B-18). Non-summary decisions exit 0.
     if not decision_should_summarise(decision):
@@ -174,6 +217,7 @@ def _run(
             block_replaced=False,
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
 
     # Step 4: transcript.
@@ -190,6 +234,7 @@ def _run(
             note_path=str(loaded.note_path),
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
 
     # Step 5: LLM call.
@@ -216,9 +261,32 @@ def _run(
             note_path=str(loaded.note_path),
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
 
     # Step 6: managed summary-block write.
+    if dry_run:
+        LOGGER.info(
+            "Dry-run note write skipped: path=%s session_id=%s transcript_sha256=%s",
+            loaded.note_path,
+            completion.session_id,
+            transcript.sha256,
+        )
+        return IngestResult(
+            ok=True,
+            exit_code=0,
+            session_id=completion.session_id,
+            session_dir=str(session_dir),
+            decision=decision.value,
+            note_path=str(loaded.note_path),
+            note_created=False,
+            block_written=False,
+            block_replaced=False,
+            terminal_status=completion.terminal_status,
+            stop_reason=completion.stop_reason,
+            dry_run=True,
+        )
+
     try:
         write_result = write_summary_block(
             loaded.note_path,
@@ -241,6 +309,7 @@ def _run(
             note_path=str(loaded.note_path),
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
     except OSError as exc:
         LOGGER.error("Note write failed: %s", exc)
@@ -253,6 +322,7 @@ def _run(
             note_path=str(loaded.note_path),
             terminal_status=completion.terminal_status,
             stop_reason=completion.stop_reason,
+            dry_run=dry_run,
         )
 
     LOGGER.info(
@@ -261,6 +331,24 @@ def _run(
         write_result.note_created,
         write_result.block_replaced,
         write_result.block_written,
+    )
+    LOGGER.info(
+        "boundary=%s %s",
+        "note_write",
+        json.dumps(
+            {
+                "session_id": completion.session_id,
+                "session_dir": str(session_dir),
+                "note_path": str(write_result.note_path),
+                **manifest_context,
+                "note_created": write_result.note_created,
+                "block_written": write_result.block_written,
+                "block_replaced": write_result.block_replaced,
+                "terminal_status": completion.terminal_status,
+                "dry_run": dry_run,
+            },
+            sort_keys=True,
+        ),
     )
 
     return IngestResult(
@@ -275,6 +363,7 @@ def _run(
         block_replaced=write_result.block_replaced,
         terminal_status=completion.terminal_status,
         stop_reason=completion.stop_reason,
+        dry_run=dry_run,
     )
 
 
@@ -288,6 +377,7 @@ def _error_result(
     note_path: str | None = None,
     terminal_status: str | None = None,
     stop_reason: str | None = None,
+    dry_run: bool = False,
 ) -> IngestResult:
     return IngestResult(
         ok=False,
@@ -302,6 +392,7 @@ def _error_result(
         terminal_status=terminal_status,
         stop_reason=stop_reason,
         error=error,
+        dry_run=dry_run,
     )
 
 

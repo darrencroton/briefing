@@ -1,9 +1,8 @@
-# `briefing session-ingest` Smoke Handoff (B-21)
+# Meeting Intelligence Smoke Handoff (B-21/B-24)
 
 This runbook captures the procedure for verifying `briefing session-ingest`
-against a real `noted` session directory. It is the cross-repo Step 7 smoke
-that completes ticket B-21. The dedicated smoke script (B-24) will automate
-most of this.
+against a real `noted` session directory. The original manual run completed
+B-21; `scripts/meeting-intelligence-smoke.sh` is the repeatable B-24 harness.
 
 ## Current Status
 
@@ -12,6 +11,25 @@ most of this.
 - Result: full chain passed — `noted start` (EXIT:0), `noted stop` (EXIT:0, audio_finalised), `completion.json` (terminal_status=completed, all *_ok=true), `briefing session-ingest` (EXIT:0, block_written=true). Guardrail #12 verified. No contract-level bugs found.
 - Earlier attempt (also 2026-04-24) blocked because the debug binary lacked bundle context for `app.noted.macos`; TCC's `requestAccess` blocked indefinitely. Resolution: use the dist app bundle and approve the mic permission dialog once after signing.
 - Full findings: see `docs/step-7-report.md` in the root repo.
+
+## Automated smoke script
+
+Run from the `briefing` repo root:
+
+```sh
+scripts/meeting-intelligence-smoke.sh
+```
+
+Useful environment overrides:
+
+- `NOTED_CMD=/path/to/Noted`
+- `BRIEFING_SMOKE_ROOT=/tmp/meeting-intelligence-smoke`
+- `CAPTURE_SECONDS=30`
+- `WAIT_SECONDS=180`
+
+The script adapts the shared valid manifest fixture, starts and stops `noted`,
+waits for `outputs/completion.json`, runs `session-ingest --dry-run`, then runs
+the real note write.
 
 ## Prerequisites
 
@@ -67,6 +85,5 @@ most of this.
 
 ## Out of scope
 
-- Formal repeatable cross-repo smoke script/runbook automation (B-24).
 - `session-reprocess` (Phase 5).
 - Retention enforcement (Phase 5).
