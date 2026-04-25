@@ -14,6 +14,7 @@ from .calendar import EventKitClient
 from .logging_utils import configure_logging
 from .planning import plan_event_by_id
 from .session.ingest import IngestResult, emit_stdout_result, run_session_ingest
+from .session.reprocess import run_session_reprocess
 from .settings import SettingsError, load_series_configs, load_settings
 from .runner import run_briefing
 from .utils import ensure_directory, slugify
@@ -52,6 +53,21 @@ def cli() -> int:
         help="Read completion/transcript and generate the summary without writing the note",
     )
 
+    reprocess_parser = subparsers.add_parser(
+        "session-reprocess",
+        help="Rerun summary generation from an existing transcript (recovery path)",
+    )
+    reprocess_parser.add_argument(
+        "--session-dir",
+        required=True,
+        help="Path to the session directory produced by noted",
+    )
+    reprocess_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate the summary without writing the note",
+    )
+
     plan_parser = subparsers.add_parser(
         "session-plan",
         help="Write a noted manifest for one calendar event",
@@ -83,6 +99,8 @@ def cli() -> int:
         return _init_series(settings, args.event_uid, args.index, args.force)
     if args.command == "session-ingest":
         return _session_ingest(settings, args.session_dir, dry_run=args.dry_run)
+    if args.command == "session-reprocess":
+        return _session_reprocess(settings, args.session_dir, dry_run=args.dry_run)
     if args.command == "session-plan":
         now = datetime.fromisoformat(args.now) if args.now else None
         return _session_plan(settings, args.event_id, now)
@@ -113,6 +131,32 @@ def _session_ingest(settings, session_dir_arg: str, *, dry_run: bool = False) ->
         )
         return 4
     result = run_session_ingest(settings, session_dir, dry_run=dry_run)
+    emit_stdout_result(result)
+    return result.exit_code
+
+
+def _session_reprocess(settings, session_dir_arg: str, *, dry_run: bool = False) -> int:
+    session_dir = Path(session_dir_arg).expanduser()
+    if not session_dir.exists() or not session_dir.is_dir():
+        emit_stdout_result(
+            IngestResult(
+                ok=False,
+                exit_code=4,
+                session_id=None,
+                session_dir=str(session_dir),
+                decision=None,
+                note_path=None,
+                note_created=False,
+                block_written=False,
+                block_replaced=False,
+                terminal_status=None,
+                stop_reason=None,
+                error=f"session-dir not found or not a directory: {session_dir}",
+                dry_run=dry_run,
+            )
+        )
+        return 4
+    result = run_session_reprocess(settings, session_dir, dry_run=dry_run)
     emit_stdout_result(result)
     return result.exit_code
 

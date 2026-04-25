@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import re
 import shutil
+import subprocess
+import tempfile
 
 from .calendar import EventKitClient
 from .llm import get_provider
@@ -11,6 +15,8 @@ from .settings import AppSettings, load_env_file
 from .sources.notion_source import NotionClient
 from .sources.slack_source import SlackClient
 from .utils import expand_path
+
+_MAJOR_ONE = re.compile(r"^1\.[0-9]+$")
 
 
 def validate_environment(settings: AppSettings, series_configs) -> list[ValidationMessage]:
@@ -36,25 +42,10 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
             ValidationMessage("error", "note_template_missing", "Note template is missing")
         )
 
-    sessions_parent = settings.meeting_intelligence.sessions_root.parent
-    if sessions_parent.exists():
-        messages.append(
-            ValidationMessage(
-                "info",
-                "sessions_root_parent_ok",
-                f"Sessions root parent found: {sessions_parent}",
-            )
-        )
-    else:
-        messages.append(
-            ValidationMessage(
-                "error",
-                "sessions_root_parent_missing",
-                f"Sessions root parent not found: {sessions_parent}",
-            )
-        )
+    _check_sessions_root(settings, messages)
 
-    if shutil.which(settings.meeting_intelligence.noted_command):
+    noted_on_path = shutil.which(settings.meeting_intelligence.noted_command)
+    if noted_on_path:
         messages.append(
             ValidationMessage(
                 "info",
@@ -62,6 +53,7 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
                 f"noted command found: {settings.meeting_intelligence.noted_command}",
             )
         )
+        _check_noted_version(settings.meeting_intelligence.noted_command, messages)
     else:
         messages.append(
             ValidationMessage(
@@ -148,3 +140,106 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
         )
 
     return messages
+
+
+def _check_sessions_root(settings: AppSettings, messages: list[ValidationMessage]) -> None:
+    """Verify sessions_root exists and is writable; report if not yet created."""
+    sessions_root = settings.meeting_intelligence.sessions_root
+    if not sessions_root.exists():
+        messages.append(
+            ValidationMessage(
+                "info",
+                "sessions_root_missing",
+                f"sessions_root does not exist yet (will be created on first use): {sessions_root}",
+            )
+        )
+        return
+    try:
+        with tempfile.NamedTemporaryFile(dir=sessions_root, prefix=".validate-", delete=True):
+            pass
+        messages.append(
+            ValidationMessage("info", "sessions_root_writable", f"sessions_root is writable: {sessions_root}")
+        )
+    except OSError as exc:
+        messages.append(
+            ValidationMessage(
+                "error",
+                "sessions_root_not_writable",
+                f"sessions_root is not writable: {sessions_root} ({exc})",
+            )
+        )
+
+
+def _check_noted_version(noted_command: str, messages: list[ValidationMessage]) -> None:
+    """Run `noted version`, verify it responds, and check schema compatibility."""
+    try:
+        result = subprocess.run(
+            [noted_command, "version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except subprocess.TimeoutExpired:
+        messages.append(
+            ValidationMessage("warning", "noted_version_failed", f"`{noted_command} version` timed out")
+        )
+        return
+    except OSError as exc:
+        messages.append(
+            ValidationMessage("warning", "noted_version_failed", f"`{noted_command} version` failed to run: {exc}")
+        )
+        return
+
+    if result.returncode != 0:
+        messages.append(
+            ValidationMessage(
+                "warning",
+                "noted_version_failed",
+                f"`{noted_command} version` exited {result.returncode}",
+            )
+        )
+        return
+
+    try:
+        payload = json.loads(result.stdout.strip())
+    except (json.JSONDecodeError, ValueError) as exc:
+        messages.append(
+            ValidationMessage("warning", "noted_version_failed", f"`{noted_command} version` output is not JSON: {exc}")
+        )
+        return
+
+    app_version = payload.get("version", "unknown")
+    messages.append(
+        ValidationMessage("info", "noted_version_ok", f"noted version: {app_version}")
+    )
+
+    raw_manifest_v = payload.get("manifest_schema_version")
+    raw_completion_v = payload.get("completion_schema_version")
+    manifest_v = str(raw_manifest_v) if raw_manifest_v is not None else None
+    completion_v = str(raw_completion_v) if raw_completion_v is not None else None
+    if manifest_v and _MAJOR_ONE.match(manifest_v) and completion_v and _MAJOR_ONE.match(completion_v):
+        messages.append(
+            ValidationMessage(
+                "info",
+                "noted_schema_compat_ok",
+                f"noted schema versions compatible: manifest={manifest_v} completion={completion_v}",
+            )
+        )
+    else:
+        for label, version in (("manifest", manifest_v), ("completion", completion_v)):
+            if version is None:
+                messages.append(
+                    ValidationMessage(
+                        "error",
+                        "noted_schema_compat_error",
+                        f"noted {label}_schema_version absent from `noted version` output",
+                    )
+                )
+            elif not _MAJOR_ONE.match(version):
+                messages.append(
+                    ValidationMessage(
+                        "error",
+                        "noted_schema_compat_error",
+                        f"noted {label}_schema_version {version!r} is not compatible with briefing (expects 1.x)",
+                    )
+                )

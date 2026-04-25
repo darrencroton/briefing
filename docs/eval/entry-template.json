@@ -1,0 +1,16 @@
+{
+  "session_id": "",
+  "series_id": null,
+  "rated_at": "YYYY-MM-DD",
+  "rater": "",
+  "coverage": null,
+  "correctness": null,
+  "action_item_recall": null,
+  "attribution_precision": null,
+  "attribution_recall": null,
+  "speaker_agnostic": true,
+  "latency_seconds": null,
+  "reference_summary": "Hand-written reference summary goes here (Markdown).",
+  "generated_summary": "Paste the machine-generated ## Meeting Summary block body here.",
+  "notes": ""
+}

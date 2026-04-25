@@ -36,7 +36,7 @@ Phase 5 gate:
 - No Phase 4 tickets remain open. Integration polish B-22 through B-25 is complete.
 - Phase 5 hardening should be prioritised from real operational data from the completed Phase 2-4 flows.
 
-Local verification on 2026-04-25: `uv run pytest` passes with 182 tests.
+Local verification on 2026-04-25: `uv run pytest` passes with 199 tests (182 Phase 4 + 17 Phase 5A).
 
 ## Cross-Repo Dependency Map
 
@@ -166,15 +166,61 @@ Integration polish focused estimate: 10 days.
 
 ## Phase 5 - Hardening
 
-Do not break this into detailed tickets yet. Use real Phase 4 failures to shape it.
+### Phase 5A — Pre-Soak Hardening — Completed 2026-04-25
 
-Broad work areas:
+Five Phase 5A items were implemented before the first real operational soak to give the team the recovery tools and measurement infrastructure needed to act on soak data without a further code drop.
 
-- `briefing session-reprocess --session-dir <path>` for rerunning summarisation on an existing transcript and, later, on retranscribed raw audio.
+**5A-01 — Meeting Intelligence preflight diagnostics**
+
+`briefing validate` now checks all Meeting Intelligence prerequisites in addition to its existing calendar/LLM/Slack checks:
+
+- `noted_command` is located via `shutil.which`; if found, `noted version` is invoked and the JSON response is checked for `manifest_schema_version` and `completion_schema_version` — both must be 1.x. Absent or wrong-major fields emit `noted_schema_compat_error`.
+- `sessions_root` is checked for existence and writability by writing a temporary file. If the directory does not yet exist, an informational message is emitted rather than silently creating the directory.
+
+Code: `src/briefing/validation.py` (`_check_sessions_root`, `_check_noted_version`). Tests: `tests/test_validation.py`.
+
+**5A-03 — Transcript-only `briefing session-reprocess`**
+
+`briefing session-reprocess --session-dir <path>` reruns the LLM summary step on an existing transcript and replaces the managed `## Meeting Summary` block. It does not require `completion.json` to be present — when absent it synthesises minimal completion context from available artefacts. Idempotent: re-running replaces the block rather than appending. `--dry-run` is supported.
+
+Code: `src/briefing/session/reprocess.py`. Tests: `tests/test_session_reprocess.py`.
+
+**5A-04 — One-week soak runbook**
+
+`docs/soak-runbook-week1.md` is the operator's guide for the first 10-meeting soak:
+
+- Per-session log table with all required fields (session id, event id, manifest path, stop mode, completion status, audio/transcript/diarization quality, ingest result, summary quality, recovery steps).
+- Daily morning/evening checklists with shell snippets.
+- Failure classification table with causes and recovery commands.
+- Recovery commands reference.
+- Week-end retrospective questions and the proceed threshold (≥ 9/10 sessions without intervention).
+
+**5A-05 — Human-rated summary evaluation set**
+
+`docs/eval/` is the regression harness infrastructure:
+
+- `README.md` — rubric with three axes (coverage, correctness, action-item recall) each on a 1–5 scale; attribution precision/recall targets; latency target; regression threshold (no axis drops > 1 point on any prompt/model change).
+- `entry-template.json` — blank entry to copy when rating a new meeting. `speaker_agnostic` defaults to `true` since diarization is often unavailable early.
+- `eval-set.json` — empty array, ready to populate from the first 8–12 real meetings.
+
+**Phase 5A code review findings resolved (2026-04-25)**
+
+Six defects found in the Phase 5A review were corrected at the same time:
+
+1. `noted wait` loop off-by-one (P1): a final file check is now made after the `repeat…while` exits so that completion appearing during the last 500 ms sleep is not missed.
+2. `briefing validate` silently creating `sessions_root` (P2): validate is now read-only; if the directory is absent it reports an info message rather than creating it.
+3. `reprocess.py` importing private functions from `ingest.py` (P2): `error_result`, `attach_session_log_handler`, and `missing_note_template` are now public (no leading underscore), documenting that they are intentionally shared between the two modules.
+4. `noted wait` missing Swift contract tests (P2): `Phase5ContractTests.swift` added to `HushScribe/Tests/NotedContractTests/` covering exit-code contract and JSON response shapes.
+5. Soak runbook hardcoded `~/noted-sessions/` path (P2): daily checklist now prompts the operator to set a `$SESSIONS` variable from their configured `sessions_root`.
+6. `entry-template.json` `speaker_agnostic` default wrong (P2): changed from `false` to `true` to match the common early-soak case.
+
+**Remaining Phase 5 broad work areas (post-soak)**
+
 - Retention coordination with `noted` once the 30-day raw-audio plus FLAC policy is implemented.
 - Better operator diagnostics for failed ingest, missing notes, invalid completion files, stale manifests, and LLM failures.
-- Regression set and human-rated summary evaluation.
 - Online/hybrid mode support once `noted` ships the capture path.
+- Raw-audio retranscription pass for `session-reprocess` (currently transcript-only).
+- Registry pruning in `noted` to prevent stale session entries accumulating over time.
 
 ## Completed Work Map
 

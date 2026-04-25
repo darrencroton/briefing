@@ -104,7 +104,7 @@ def run_session_ingest(
     session_handler: logging.Handler | None = None
     session_log_path = session_dir / "logs" / "briefing.log"
     try:
-        session_handler = _attach_session_log_handler(session_log_path)
+        session_handler = attach_session_log_handler(session_log_path)
     except OSError as exc:  # pragma: no cover - rare, captured as warning
         LOGGER.warning("Could not attach session log handler (%s): %s", session_log_path, exc)
 
@@ -130,7 +130,7 @@ def _run(
         completion = read_completion(session_dir)
     except CompletionError as exc:
         LOGGER.error("Completion read failed: %s", exc)
-        return _error_result(session_dir, exc.exit_code, str(exc), dry_run=dry_run)
+        return error_result(session_dir, exc.exit_code, str(exc), dry_run=dry_run)
 
     LOGGER.info(
         "Completion loaded: session_id=%s terminal_status=%s stop_reason=%s "
@@ -165,7 +165,7 @@ def _run(
         loaded = load_session(session_dir, completion=completion)
     except SessionLoadError as exc:
         LOGGER.error("Session load failed: %s", exc)
-        return _error_result(
+        return error_result(
             session_dir,
             exc.exit_code,
             str(exc),
@@ -225,7 +225,7 @@ def _run(
         transcript = load_transcript(loaded.transcript_text_path)
     except TranscriptError as exc:
         LOGGER.error("Transcript load failed: %s", exc)
-        return _error_result(
+        return error_result(
             session_dir,
             exc.exit_code,
             str(exc),
@@ -252,7 +252,7 @@ def _run(
         )
     except SummaryGenerationError as exc:
         LOGGER.error("Summary generation failed: %s", exc)
-        return _error_result(
+        return error_result(
             session_dir,
             exc.exit_code,
             str(exc),
@@ -294,13 +294,13 @@ def _run(
             summary.text,
             session_id=completion.session_id,
             transcript_sha256=transcript.sha256,
-            missing_note_template=_missing_note_template(settings)
+            missing_note_template=missing_note_template(settings)
             if not loaded.note_path.exists()
             else None,
         )
     except NoteStructureError as exc:
         LOGGER.error("Note structure error: %s", exc)
-        return _error_result(
+        return error_result(
             session_dir,
             5,
             str(exc),
@@ -313,7 +313,7 @@ def _run(
         )
     except OSError as exc:
         LOGGER.error("Note write failed: %s", exc)
-        return _error_result(
+        return error_result(
             session_dir,
             7,
             f"Failed to write note: {exc}",
@@ -367,7 +367,7 @@ def _run(
     )
 
 
-def _error_result(
+def error_result(
     session_dir: Path,
     exit_code: int,
     error: str,
@@ -396,7 +396,7 @@ def _error_result(
     )
 
 
-def _attach_session_log_handler(log_path: Path) -> logging.Handler:
+def attach_session_log_handler(log_path: Path) -> logging.Handler:
     """Append session-scoped logs to ``<session>/logs/briefing.log``."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
@@ -407,7 +407,7 @@ def _attach_session_log_handler(log_path: Path) -> logging.Handler:
     return handler
 
 
-def _missing_note_template(settings: AppSettings) -> MissingNoteTemplate:
+def missing_note_template(settings: AppSettings) -> MissingNoteTemplate:
     template_path = settings.paths.template_dir / settings.llm.note_template
     return MissingNoteTemplate(
         template_text=template_path.read_text(encoding="utf-8"),
