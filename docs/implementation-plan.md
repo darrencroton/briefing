@@ -9,7 +9,7 @@ Authoritative inputs:
 - `../vendor/contracts/contracts/schemas/completion.v1.json`
 - `../vendor/contracts/contracts/session-directory.md`
 - `../vendor/contracts/contracts/cli-contract.md`
-- Existing CLI: `briefing run`, `briefing validate`, `briefing init-series`
+- Existing CLI: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-plan`, `briefing watch`, `briefing session-ingest`
 - Existing source adapter package: `src/briefing/sources/`
 - Existing note writer: `src/briefing/notes.py`
 
@@ -22,6 +22,21 @@ This plan assumes the current copied-snapshot mechanism: `vendor/contracts/CONTR
 `briefing` owns calendar interpretation, event eligibility, manifest contents, next-meeting lookahead, LLM summarisation, and Obsidian note writes.
 
 `briefing` must not own capture state. It invokes `noted start --manifest <path>` at pre-roll time and later ingests `completion.json`; it does not infer outcomes from file presence or logs.
+
+## Current Status - 2026-04-25
+
+Completed:
+
+- Phase 4a ingestion and summarisation: B-12 through B-20.
+- Step 7 vertical slice and B-21: hand-written manifest through `noted` capture, completion, `briefing session-ingest`, and managed summary block.
+- Phase 4b planning/watch: B-01 through B-11.
+
+Remaining before Phase 5 hardening:
+
+- Integration polish: B-22 through B-25.
+- Phase 5 should still wait for real operational data from the completed Phase 2-4 flows.
+
+Local verification on 2026-04-25: `uv run pytest` passes with 180 tests.
 
 ## Cross-Repo Dependency Map
 
@@ -52,30 +67,42 @@ Goal: `briefing` detects eligible calendar events, writes contract-valid manifes
 
 ### Tickets
 
-| Ticket | Title | Estimate | Dependencies | Acceptance notes |
-| --- | --- | ---: | --- | --- |
-| B-01 | Add Meeting Intelligence settings | 2 days | Current settings loader | Adds sessions root, noted command path, pre-roll default 90 seconds with configurable 60-180 second bounds, default host/language/asr/backend policy, and one-off note defaults. One-off `noted config` events default to `paths.meeting_notes_dir` unless a new setting overrides it |
-| B-02 | Extend series YAML model for recording metadata | 3 days | B-01 | Adds record flag, mode, participants, transcription, recording policy, and optional per-series defaults without breaking existing series |
-| B-03 | Parse `noted config` event notes | 3 days | B-02 | Case-insensitive marker; supports field-level overrides and `record: false`; tests series override and one-off marker paths |
-| B-04 | Implement event eligibility resolver | 2 days | B-03 | Encodes section 27.2 decision; returns skip reasons suitable for logs and diagnostics |
-| B-05 | Build manifest assembly module | 5 days | B-01 through B-04 | Produces `manifest.v1.json` shape; derives session id, note path, participants, policy, and speaker hints |
-| B-06 | Add manifest schema validation tests | 2 days | B-05 | Validates generated manifests against pinned contracts and rejects naive timestamps |
-| B-07 | Implement next-meeting lookahead and pre-write | 4 days | B-05 | Writes next manifest in advance and populates current `next_meeting.manifest_path`; no runtime query by `noted` needed |
-| B-08 | Add `briefing session-plan` CLI | 3 days | B-05, B-07 | Supports `--event-id`; prints machine-readable result with manifest path and skip reason |
-| B-09 | Implement `briefing watch` scheduling loop | 5 days | B-08 | Starts `noted` at pre-roll; respects one active launch per event; persists state for restarts |
-| B-10 | Implement manifest invalidation sweep | 4 days | B-07, B-09 | Deletes or rewrites pre-prepared manifests when calendar state changes; logs all decisions |
-| B-11 | Add launchd support for `briefing watch` | 2 days | B-09 | Installs separately from existing batch `briefing run`; existing launchd flow remains usable |
+| Ticket | Status | Title | Estimate | Dependencies | Acceptance notes |
+| --- | --- | --- | ---: | --- | --- |
+| B-01 | Completed | Add Meeting Intelligence settings | 2 days | Current settings loader | Adds sessions root, noted command path, pre-roll default 90 seconds with configurable 60-180 second bounds, default host/language/asr/backend policy, and one-off note defaults. One-off `noted config` events default to `paths.meeting_notes_dir` unless a new setting overrides it |
+| B-02 | Completed | Extend series YAML model for recording metadata | 3 days | B-01 | Adds record flag, mode, participants, transcription, recording policy, and optional per-series defaults without breaking existing series |
+| B-03 | Completed | Parse `noted config` event notes | 3 days | B-02 | Case-insensitive marker; supports field-level overrides and `record: false`; tests series override and one-off marker paths |
+| B-04 | Completed | Implement event eligibility resolver | 2 days | B-03 | Encodes section 27.2 decision; returns skip reasons suitable for logs and diagnostics |
+| B-05 | Completed | Build manifest assembly module | 5 days | B-01 through B-04 | Produces `manifest.v1.json` shape; derives session id, note path, participants, policy, and speaker hints |
+| B-06 | Completed | Add manifest schema validation tests | 2 days | B-05 | Validates generated manifests against pinned contracts and rejects naive timestamps |
+| B-07 | Completed | Implement next-meeting lookahead and pre-write | 4 days | B-05 | Writes next manifest in advance and populates current `next_meeting.manifest_path`; no runtime query by `noted` needed |
+| B-08 | Completed | Add `briefing session-plan` CLI | 3 days | B-05, B-07 | Supports `--event-id`; prints machine-readable result with manifest path and skip reason |
+| B-09 | Completed | Implement `briefing watch` scheduling loop | 5 days | B-08 | Starts `noted` at pre-roll; respects one active launch per event; persists state for restarts |
+| B-10 | Completed | Implement manifest invalidation sweep | 4 days | B-07, B-09 | Archives or rewrites pre-prepared manifests when calendar state changes; logs all decisions |
+| B-11 | Completed | Add launchd support for `briefing watch` | 2 days | B-09 | Installs separately from existing batch `briefing run`; existing launchd flow remains usable |
 
 Phase 4 planning/watch focused estimate: 35 days.
 
-### Open Questions
+### Resolved Questions
 
-- What reschedule tolerance should `briefing watch` use when deciding to rewrite versus delete a next manifest?
-- Should `briefing watch` persist planned manifest state in the existing `StateStore` or a dedicated session-planning state file?
+- Reschedule tolerance is configurable as `[meeting_intelligence].reschedule_tolerance_seconds`, defaulting to 300 seconds.
+- Planned manifest state is persisted through `StateStore` under `state/session-plans/`.
 
 ### Implementation Note
 
 - Product decision: pre-prepared manifests may be updated before they are consumed by `noted` when that is required for the desired UX, including active-meeting `next_meeting` refresh and in-tolerance calendar reschedules. Future contract work should align manifest mutability wording with this behavior rather than treating every planned manifest as immutable from first write.
+
+### Phase 4b Planning/Watch - Completed 2026-04-25
+
+B-01 through B-11 are complete. The shipped surface includes `[meeting_intelligence]` settings, recording metadata on series configs, `noted config` event note parsing, eligibility resolution, contract-valid manifest assembly, next-meeting pre-write, `briefing session-plan`, `briefing watch`, invalidation/rewrite handling for pre-prepared manifests, active-session next-meeting refresh, and a separate `launchd` helper for the watcher.
+
+Implementation evidence:
+
+- CLI entries live in `src/briefing/main.py`.
+- Planning and invalidation logic lives in `src/briefing/planning.py`.
+- Watch loop lives in `src/briefing/watch.py`.
+- LaunchAgent helpers live under `scripts/launchd/`.
+- Tests cover planning, manifest validation, watch launch/idempotency, cancellation, in-tolerance and out-of-tolerance reschedules, active next-meeting refresh, and malformed event config handling.
 
 ## Phase 4 - Session Ingestion and Summarisation
 
@@ -149,53 +176,27 @@ Broad work areas:
 - Regression set and human-rated summary evaluation.
 - Online/hybrid mode support once `noted` ships the capture path.
 
-## Tickets in the First Vertical Slice
+## Completed Work Map
 
-The full Phase 4 estimate is not the Step 7 estimate. Step 7 should prove one narrow end-to-end path before the team builds the whole watch and popup surface.
+The first vertical slice and planning/watch work are complete:
 
-Minimum `briefing` slice:
+- Minimal ingestion slice: B-12 through B-20.
+- Real noted-session handoff: B-21.
+- Calendar planning/watch: B-01 through B-11.
 
-- B-12 and B-13 to read a completed session directory from `completion.json` first.
-- B-14 with `transcript/transcript.txt` support.
-- B-15 and B-16 with a first post-meeting prompt path.
-- B-17 for the `## Meeting Summary` managed block.
-- B-19 for `briefing session-ingest --session-dir <path>`.
-- B-20 against synthetic session directories.
+The next development team should start with polish, not the original bring-up slice:
 
-If Step 7 must be calendar-driven rather than "record then manually ingest":
-
-- Add B-01 through B-08 for manifest planning.
-- Add only the thinnest launch path from B-09; full invalidation sweep B-10 can follow.
-- B-24 owns the cross-repo smoke script because `briefing` is the orchestration component.
-
-Explicitly out of the first slice:
-
-- Full `briefing watch` invalidation polish.
-- `session-reprocess`.
-- Retention enforcement.
-- Online/hybrid mode.
-
-## Tickets That Can Start Tomorrow
-
-- B-01 settings extension.
-- B-02 series YAML model extension.
-- B-03 `noted config` parser.
-- B-12 completion reader and validator.
-- B-14 transcript source adapter against synthetic session directories.
-- B-17 summary block writer tests, after the heading string is chosen.
+- B-22 cross-boundary diagnostics.
+- B-23 operator dry-run modes, including ingest without writing a note.
+- B-24 formal repeatable smoke script/runbook.
+- B-25 user docs for the full recording workflow.
 
 ## Highest-Risk Assumptions
 
-- The existing note refresh logic can append a new managed summary block after user notes while preserving user content byte-for-byte.
-- `briefing watch` can be long-running enough for pre-roll and invalidation without destabilizing the existing batch `run` command.
-- One-off `noted config` events can be given sensible defaults without forcing users to create series YAML for every recording.
-- The first useful transcript summary can reuse the current LLM provider abstraction without a separate provider path.
-
-Cheapest ways to test these:
-
-- Write summary-block preservation tests before integrating LLM calls.
-- Implement `session-ingest` against synthetic session directories before waiting for `noted` Phase 2.
-- Run `briefing watch` in a dry-run mode against a test calendar to verify pre-roll and invalidation state.
+- The existing note refresh logic can append a new managed summary block after user notes while preserving user content byte-for-byte. **Proved in B-17 tests and Step 7.**
+- `briefing watch` can be long-running enough for pre-roll and invalidation without destabilizing the existing batch `run` command. **Covered by watch tests; real operational soak still pending.**
+- One-off `noted config` events can be given sensible defaults without forcing users to create series YAML for every recording. **Implemented for planning; ad hoc canonical Start in `noted` is still N-23.**
+- The first useful transcript summary can reuse the current LLM provider abstraction without a separate provider path. **Implemented in B-16 and exercised by Step 7.**
 
 ## Review Questions
 

@@ -22,6 +22,8 @@ When `briefing` runs (manually or via `launchd`), it:
 4. sends the context to an LLM CLI (`claude`, `codex`, `copilot`, or `gemini`)
 5. writes or refreshes the briefing block in the meeting note until the meeting starts
 
+For the Meeting Intelligence recording workflow, `briefing session-plan` writes contract-valid `noted` manifests, and `briefing watch` keeps upcoming meeting manifests current and invokes `noted start --manifest` at pre-roll. After capture finishes, `briefing session-ingest` reads `completion.json` first and writes the managed post-meeting summary.
+
 If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends a managed `## Meeting Summary` block with an LLM-generated post-meeting summary; re-running ingest replaces only that block.
 
 Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
@@ -29,13 +31,19 @@ Only meetings you have explicitly configured are processed. If a required source
 ## Current Capabilities
 
 - Python `3.13+` application managed with `uv`
-- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-ingest`
+- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-plan`, `briefing watch`, `briefing session-ingest`
 - Apple Calendar ingestion via EventKit
 - Explicit series configuration under `user_config/series/*.yaml`
 - Sources: `previous_note`, `slack`, `notion`, `file`, `email`
 - Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`
 - Local state and diagnostics under `state/`
-- `launchd` helper scripts for unattended macOS runs
+- `launchd` helper scripts for unattended batch and watcher runs
+
+Remaining Meeting Intelligence polish:
+
+- automatic `noted` ingest handoff from the capture agent
+- cross-boundary diagnostics and formal smoke script/runbook
+- operator dry-runs and expanded user docs for the recording workflow
 
 ## Quickstart
 
@@ -130,6 +138,20 @@ uv run briefing run
 ```
 
 Only after validation and a successful manual run should you install automation with the guides under [`scripts/launchd/README.md`](scripts/launchd/README.md).
+
+### 7. Optional: plan and watch recorded meetings
+
+After `noted` is installed and permissioned, dry-run one watch cycle:
+
+```bash
+uv run briefing watch --once --dry-run
+```
+
+To inspect a single manifest plan:
+
+```bash
+uv run briefing session-plan --event-id "EVENT-UID-HERE"
+```
 
 ## LLM Configuration
 

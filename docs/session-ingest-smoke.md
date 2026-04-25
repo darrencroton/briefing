@@ -67,6 +67,6 @@ most of this.
 
 ## Out of scope
 
-- Full `briefing watch` invalidation polish (Phase 4 planning side).
+- Formal repeatable cross-repo smoke script/runbook automation (B-24).
 - `session-reprocess` (Phase 5).
 - Retention enforcement (Phase 5).
