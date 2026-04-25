@@ -31,10 +31,10 @@ Completed:
 - Step 7 vertical slice and B-21: hand-written manifest through `noted` capture, completion, `briefing session-ingest`, and managed summary block.
 - Phase 4b planning/watch: B-01 through B-11.
 
-Remaining before Phase 5 hardening:
+Phase 5 gate:
 
-- Integration polish B-22 through B-25 is complete.
-- Phase 5 should still wait for real operational data from the completed Phase 2-4 flows.
+- No Phase 4 tickets remain open. Integration polish B-22 through B-25 is complete.
+- Phase 5 hardening should be prioritised from real operational data from the completed Phase 2-4 flows.
 
 Local verification on 2026-04-25: `uv run pytest` passes with 182 tests.
 
