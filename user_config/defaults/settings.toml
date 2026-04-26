@@ -1,6 +1,6 @@
 [paths]
 vault_root = "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault"
-meeting_notes_dir = "Work/Resources/Meetings"
+meeting_notes_dir = "Internal/Meetings"
 log_dir = "logs"
 state_dir = "state"
 prompt_dir = "user_config/prompts"
@@ -35,7 +35,7 @@ include_all_day = false
 window_min_minutes = 10
 window_max_minutes = 45
 # Calendar names can be a single quoted string or a list of quoted strings.
-include_calendar_names = []
+include_calendar_names = ["Calendar"]
 exclude_calendar_names = []
 lookback_days_for_init = 14
 
