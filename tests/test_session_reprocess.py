@@ -1,4 +1,4 @@
-"""Tests for briefing session-reprocess (Phase 5A-03)."""
+"""Tests for briefing session-reprocess."""
 
 from __future__ import annotations
 
@@ -161,7 +161,7 @@ def test_reprocess_dry_run_does_not_write(tmp_path: Path, app_settings) -> None:
 
 def test_reprocess_creates_missing_note(tmp_path: Path, app_settings) -> None:
     """If the note doesn't exist, reprocess creates it from the template."""
-    fx = _write_session(tmp_path)  # no note_seed → note_path doesn't exist
+    fx = _write_session(tmp_path)  # no note_seed to note_path doesn't exist
     provider = StubProvider()
 
     result = run_session_reprocess(app_settings, fx.session_dir, provider=provider)

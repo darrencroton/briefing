@@ -1,8 +1,8 @@
-"""Completed-session directory model and loader (B-13).
+"""Completed-session directory model and loader.
 
-The session directory is the canonical layout from the contracts (§11 / v1.0).
+The session directory is the canonical layout from the contracts (section 11 / v1.0).
 Callers pass one directory; this module resolves every artefact path from the
-manifest. The note path is always read from ``manifest.paths.note_path`` —
+manifest. The note path is always read from ``manifest.paths.note_path``;
 never inferred from filenames (guardrail 6).
 """
 

@@ -1,7 +1,7 @@
-"""Top-level session-ingest orchestration (B-18, B-19).
+"""Top-level session-ingest orchestration.
 
 Reads the completion file first, applies the partial-context policy from
-master plan §27.5, then — when a summary is warranted — loads the transcript,
+the partial-context policy, then - when a summary is warranted - loads the transcript,
 invokes the LLM, and writes the managed `## Meeting Summary` block.
 
 Exit codes are stable for ``noted`` to consume:
@@ -199,7 +199,7 @@ def _run(
         ),
     )
 
-    # Step 3: partial-context policy (B-18). Non-summary decisions exit 0.
+    # Partial-context decisions are recoverable no-ops.
     if not decision_should_summarise(decision):
         LOGGER.info(
             "No summary will be generated (%s); raw artefacts preserved for session-reprocess.",

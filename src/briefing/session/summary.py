@@ -1,4 +1,4 @@
-"""Post-meeting summary generator (B-16)."""
+"""Post-meeting summary generator."""
 
 from __future__ import annotations
 

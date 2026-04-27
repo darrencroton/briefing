@@ -1,4 +1,4 @@
-"""Completion-file reader and ingest-decision resolver (B-12).
+"""Completion-file reader and ingest-decision resolver.
 
 `briefing session-ingest` must read `outputs/completion.json` first; it never
 infers session outcome from file presence or log parsing (guardrail 3).
@@ -68,8 +68,8 @@ class IngestDecision(str, Enum):
 
     - ``SUMMARISE`` / ``SUMMARISE_WITH_WARNINGS``: transcript is available, run
       the full post-meeting flow.
-    - ``TRANSCRIPT_MISSING``: raw audio survived but the transcript did not —
-      recoverable via ``session-reprocess`` once that lands.
+    - ``TRANSCRIPT_MISSING``: raw audio survived but the transcript did not;
+      recoverable via ``session-reprocess``.
     - ``STARTUP_FAILED``: no audio captured at all; nothing to recover.
     """
 
@@ -160,7 +160,7 @@ def read_completion(session_dir: Path) -> Completion:
 
 
 def decide(completion: Completion) -> IngestDecision:
-    """Map a completion payload onto the ingest decision tree (§27.5)."""
+    """Map a completion payload onto the ingest decision tree (section 27.5)."""
     if not completion.audio_capture_ok:
         return IngestDecision.STARTUP_FAILED
     if not completion.transcript_ok:

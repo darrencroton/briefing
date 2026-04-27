@@ -1,8 +1,8 @@
-# Phase 5A Soak Runbook — Week 1
+# Release Soak Runbook - Week 1
 
-**Period:** 2026-04-25 → 2026-05-02  
-**Goal:** Ten unattended meetings across seven days with zero developer intervention needed to recover.  
-**Success criterion:** ≥ 95% of scheduled sessions produce a usable summary or a clearly recoverable state.
+**Period:** 2026-04-25 to 2026-05-02  
+**Goal:** Ten unattended meetings across seven days with no manual recovery needed.  
+**Success criterion:** At least 95% of scheduled sessions produce a usable summary or a clearly recoverable state.
 
 ---
 
@@ -26,7 +26,7 @@ Copy one row for each meeting. Fill in columns as the session progresses.
 | **Ingest result** | ok / skipped (reason) / failed (reason) |
 | **Summary written?** | yes / no |
 | **Summary quality** | 1–5 (see rubric) |
-| **Recovery needed?** | no / yes — describe |
+| **Recovery needed?** | no / yes - describe |
 | **Recovery command** | (e.g. `briefing session-reprocess --session-dir <path>`) |
 | **Notes** | |
 
@@ -43,7 +43,7 @@ Copy one row for each meeting. Fill in columns as the session progresses.
 > **Set your sessions root once:**
 > ```bash
 > SESSIONS=$(grep sessions_root user_config/settings.toml | awk -F'"' '{print $2}')
-> # Or read it directly: SESSIONS="$HOME/noted-sessions"   ← substitute your configured path
+> # Or read it directly: SESSIONS="$HOME/noted-sessions"   # substitute your configured path
 > ```
 
 Run these each morning before the first meeting:
@@ -64,7 +64,7 @@ And each evening:
 ```bash
 # 1. Check for sessions that produced completion_with_warnings
 for d in "$SESSIONS"/*/; do
-  jq -r '"[\(.session_id)] \(.terminal_status) — \(.stop_reason)"' "$d/outputs/completion.json" 2>/dev/null
+  jq -r '"[\(.session_id)] \(.terminal_status) - \(.stop_reason)"' "$d/outputs/completion.json" 2>/dev/null
 done
 
 # 2. Check briefing.log entries for ingest failures
@@ -80,7 +80,7 @@ grep -r "ERROR\|WARN" "$SESSIONS"/*/logs/briefing.log 2>/dev/null | tail -30
 
 | Symptom | Likely cause | Recovery |
 |---------|--------------|----------|
-| `completion.json` absent after 10+ min | `noted` crashed post-capture | Check `noted.log`; audio probably on disk — run `briefing session-reprocess` once transcript is manually generated |
+| `completion.json` absent after 10+ min | `noted` crashed post-capture | Check `noted.log`; audio is usually on disk; run `briefing session-reprocess` once transcript is available |
 | `transcript_ok: false`, `audio_capture_ok: true` | ASR failed | Wait; re-trigger `noted`'s transcript from audio if WhisperKit supports it |
 | `transcript_ok: true`, ingest skipped | `ingest_after_completion=false` or briefing command not configured | Run `briefing session-ingest --session-dir <path>` manually |
 | Summary block missing from note | LLM call timed out or failed | Run `briefing session-reprocess --session-dir <path>` |
@@ -121,11 +121,11 @@ uv run briefing validate
 4. Did diarization quality degrade during any meeting type?
 5. Did any session fail silently (no completion.json, no error surfaced)?
 6. Is 90-second pre-roll reliably getting the first words?
-7. Any new open questions to add to the master plan §27?
+7. Any new open questions to record in the project plan?
 
 ---
 
 ## After the Soak
 
 Populate the human-rated evaluation set (`docs/eval/`) from the 8–12 best sessions.  
-Threshold for proceeding to full Phase 5: ≥ 9 of 10 sessions produced a usable summary with no developer intervention.
+Release threshold: at least 9 of 10 sessions produced a usable summary with no manual recovery.

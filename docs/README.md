@@ -8,6 +8,8 @@ Use these docs in this order:
    Use this once the base install works and you are ready to add Slack, Notion, local files, or rely on the automatic previous-note source.
 3. [`../scripts/launchd/README.md`](../scripts/launchd/README.md)
    Use this only after manual validation and a successful manual `run` or watcher dry-run.
+4. [`soak-runbook-week1.md`](soak-runbook-week1.md)
+   Use this during the one-week release soak after both `briefing` and `noted` are installed and permissioned.
 
 ## What Lives Where
 
@@ -19,6 +21,8 @@ Use these docs in this order:
   Source-specific setup guides with step-by-step instructions.
 - `scripts/launchd/README.md`
   Automation setup for both batch `briefing run` and long-running `briefing watch`.
+- `docs/soak-runbook-week1.md`
+  Operational checklist for the current release-candidate soak.
 
 ## Fast Path For New Users
 
@@ -28,5 +32,5 @@ Use these docs in this order:
 4. Create one series with `uv run briefing init-series`.
 5. Run `uv run briefing run`.
 6. Add source-specific configuration using the guides under [`source-guides/`](source-guides/README.md).
-7. For recording workflows, run `uv run briefing watch --once --dry-run` and inspect `uv run briefing session-plan --event-id <event-id>`.
+7. For recording workflows, install `noted`, run `uv run briefing watch --once --dry-run`, and inspect `uv run briefing session-plan --event-id <event-id>`.
 8. Install `launchd` only after the manual flow is working.

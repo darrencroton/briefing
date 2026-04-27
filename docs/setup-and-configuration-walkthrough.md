@@ -32,13 +32,14 @@ The Meeting Intelligence recording flow adds:
 1. `briefing session-plan --event-id <id>` writes a contract-valid `manifest.json`
 2. `briefing watch` polls upcoming events, refreshes pre-written next manifests, and invokes `noted start --manifest <path>` at pre-roll
 3. `briefing session-ingest --session-dir <path>` reads `completion.json` and writes the managed `Meeting Summary` block
+4. `briefing session-reprocess --session-dir <path>` reruns summary generation from an existing completed session
 
 Important behavior:
 
 - unconfigured meetings are skipped
 - matching uses explicit rules, not title-only heuristics
-- only the managed summary block is refreshed
-- edits from `Meeting Notes` onward lock that occurrence against further automated rewrites
+- only managed blocks are refreshed
+- user-owned note content is preserved across rewrites
 - required source failures block note generation
 
 ## Minimal first working setup
@@ -74,7 +75,7 @@ The default `paths.series_dir` is already correct for the repo:
 paths.series_dir = "user_config/series"
 ```
 
-For recording handoff, review `[meeting_intelligence]`. The defaults write session manifests under `sessions/`, call `noted`, and launch 90 seconds before the scheduled start.
+For recording handoff, review `[meeting_intelligence]`. The defaults write session manifests under `sessions/`, call `noted`, and launch 90 seconds before the scheduled start. `noted` is configured separately in `~/Library/Application Support/noted/settings.toml`.
 
 ### 3. Grant Calendar access
 
@@ -151,6 +152,13 @@ uv run briefing session-ingest --session-dir /path/to/noted/session --dry-run
 ```
 
 When ready, run the same command without `--dry-run`. In normal operation this handoff is automatic: after `outputs/completion.json` is written, `noted` invokes `briefing session-ingest --session-dir <session_dir>` and stores stdout/stderr under the session `logs/` directory.
+
+To rerun summary generation from the same transcript:
+
+```bash
+uv run briefing session-reprocess --session-dir /path/to/noted/session --dry-run
+uv run briefing session-reprocess --session-dir /path/to/noted/session
+```
 
 ## LLM provider setup
 

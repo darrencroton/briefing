@@ -1,19 +1,19 @@
 # Human-Rated Summary Evaluation Set
 
 **Target size:** 8–12 meetings  
-**Purpose:** Regression harness for prompt changes and LLM provider swaps (§24.1)
+**Purpose:** Regression harness for prompt changes and LLM provider swaps
 
 ---
 
 ## What Goes Here
 
-One JSON entry per rated meeting in `eval-set.json`. Each entry is a human assessment of a generated summary against a hand-written reference. Entries are populated from the first real meetings after the Phase 5A soak begins.
+One JSON entry per rated meeting in `eval-set.json`. Each entry is a human assessment of a generated summary against a hand-written reference. Entries are populated from real meetings during the release soak and later regression passes.
 
 ---
 
 ## Rating Rubric
 
-### Primary axes (§24.1)
+### Primary axes
 
 Rate each on a **1–5 integer scale**:
 
@@ -23,20 +23,20 @@ Rate each on a **1–5 integer scale**:
 | **Correctness** | Invented facts, hallucinated attributions, or materially wrong claims | Mostly accurate; minor paraphrasing errors | Factually exact relative to the transcript; nothing invented |
 | **Action-item recall** | Action items from the transcript are missing | Most actions present; some missed or vague | Every extractable action item (what + who + when) is present |
 
-### Attribution accuracy (§24.2)
+### Attribution accuracy
 
 Measured per-session when speaker identity is known:
 
-- **Attribution precision** — of names used in the summary, what fraction are correctly attributed?  
-  *Target: ≥ 0.90*
-- **Attribution recall** — of correctly-known attributions in the reference, what fraction appear in the summary?
+- **Attribution precision** - of names used in the summary, what fraction are correctly attributed?
+  *Target: at least 0.90*
+- **Attribution recall** - of correctly-known attributions in the reference, what fraction appear in the summary?
 
 If diarization was unavailable or produced `diarization_ok: false`, set both to `null` and note `"speaker_agnostic": true`.
 
-### End-to-end latency (§24.3)
+### End-to-end latency
 
 Time in seconds from `completion.json.completed_at` to the summary block appearing in the Obsidian note.  
-*Target: ≤ 300 s for a one-hour meeting.*
+*Target: no more than 300 s for a one-hour meeting.*
 
 ---
 
@@ -79,9 +79,9 @@ See `entry-template.json` for the canonical shape. Required fields:
 
 ```
 docs/eval/
-  README.md           — this file (rubric + instructions)
-  entry-template.json — blank entry to copy when rating a new meeting
-  eval-set.json       — array of rated entries; empty until first real meetings are rated
+  README.md           - this file (rubric + instructions)
+  entry-template.json - blank entry to copy when rating a new meeting
+  eval-set.json       - array of rated entries; empty until first real meetings are rated
 ```
 
 `eval-set.json` is the regression harness input. Do not rename it.

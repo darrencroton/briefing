@@ -1,4 +1,4 @@
-"""Post-meeting prompt rendering (B-15)."""
+"""Post-meeting prompt rendering."""
 
 from __future__ import annotations
 

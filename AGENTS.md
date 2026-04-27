@@ -17,9 +17,9 @@ The primary target is Obsidian, but public-facing docs and defaults should avoid
 - Supported LLM CLIs are `claude`, `codex`, `copilot`, and `gemini`.
 - CLI providers must be validated for non-interactive automation use; Gemini support is only for API-key or Vertex-style automation credentials, not interactive Google OAuth.
 
-## Current Status
+## Current CLI Surface
 
-Phase 4 (planning/watch + session ingestion) and Phase 5A pre-soak hardening are complete. The shipped CLI surface is:
+The shipped CLI surface is:
 
 ```
 briefing run            # pre-meeting briefing (existing)
@@ -31,7 +31,7 @@ briefing session-ingest # consume a completed noted session and write the summar
 briefing session-reprocess  # rerun summary from an existing transcript (recovery path)
 ```
 
-Phase 5 full hardening starts after the first operational soak (`docs/soak-runbook-week1.md`). See `docs/implementation-plan.md` for the full ticket history.
+The release soak checklist lives in `docs/soak-runbook-week1.md`.
 
 ## Product Constraints
 
@@ -39,7 +39,7 @@ Phase 5 full hardening starts after the first operational soak (`docs/soak-runbo
 - Match series with explicit rules, not title-only heuristics.
 - Keep occurrence state stable across event title changes.
 - Refresh only the managed `## Briefing` pre-meeting block (`briefing run`). Write and replace only the managed `## Meeting Summary` post-meeting block (`briefing session-ingest` and `briefing session-reprocess`).
-- Never touch user-owned content — `## Meeting Notes`, `Actions`, or any content between or after managed blocks.
+- Never touch user-owned content: `## Meeting Notes`, `Actions`, or any content between or after managed blocks.
 - Treat required source failures as blocking.
 - Prefer local-first operation and minimal moving parts.
 - Keep output as portable Markdown wherever practical, even when the default workflow is Obsidian-first.

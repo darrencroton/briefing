@@ -1,14 +1,14 @@
 # Briefing
 
-You have a recurring meeting in ten minutes. Over the past week you've traded Slack messages with the person, there are open items from last time, and a couple of Notion pages have been updated. You could spend the next ten minutes skimming all of that — or you could open your meeting note and find a short, focused summary already waiting for you.
+You have a recurring meeting in ten minutes. Over the past week you've traded Slack messages with the person, there are open items from last time, and a couple of Notion pages have been updated. You could spend the next ten minutes skimming all of that - or you could open your meeting note and find a short, focused summary already waiting for you.
 
-`briefing` does that. It reads your Apple Calendar, and for each meeting series you configure, it pulls recent context from the sources you actually use — Slack channels and DMs, Notion pages, local files, Apple Mail, and the previous meeting note — sends it to an LLM, and writes a concise pre-meeting briefing into a Markdown note. The note lands in Obsidian (or any Markdown workspace you point it at), ready to glance at before you walk in.
+`briefing` does that. It reads your Apple Calendar, and for each meeting series you configure, it pulls recent context from the sources you actually use - Slack channels and DMs, Notion pages, local files, Apple Mail, and the previous meeting note - sends it to an LLM, and writes a concise pre-meeting briefing into a Markdown note. The note lands in Obsidian (or any Markdown workspace you point it at), ready to glance at before you walk in.
 
 You choose which meetings get briefings and which sources feed each one. A short YAML file per meeting series is all it takes. Everything runs locally on your Mac, on a schedule or on demand.
 
 ### What a briefing looks like
 
-Each meeting note gets a `## Briefing` section with a handful of bullets — typically 3 to 6 — that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. Each bullet ends with a compact source/date tag so you can see where the point came from. No filler, no channel-wide noise, no generic summaries.
+Each meeting note gets a `## Briefing` section with a handful of bullets - typically 3 to 6 - that capture what actually matters for *this* meeting with *this* person: open actions, recent discussion threads you were part of, decisions pending, schedule changes. Each bullet ends with a compact source/date tag so you can see where the point came from. No filler, no channel-wide noise, no generic summaries.
 
 The rest of the note is yours. `briefing` only manages the briefing block; everything from `## Meeting Notes` onward is preserved and carried forward as previous-note context for the next briefing. You can start drafting notes before the meeting and keep editing them while `briefing` continues to refresh the `## Briefing` block up until the meeting start time.
 
@@ -22,7 +22,7 @@ When `briefing` runs (manually or via `launchd`), it:
 4. sends the context to an LLM CLI (`claude`, `codex`, `copilot`, or `gemini`)
 5. writes or refreshes the briefing block in the meeting note until the meeting starts
 
-For the Meeting Intelligence recording workflow, `briefing session-plan` writes contract-valid `noted` manifests, and `briefing watch` keeps upcoming meeting manifests current and invokes `noted start --manifest` at pre-roll. After capture finishes, `briefing session-ingest` reads `completion.json` first and writes the managed post-meeting summary.
+For the Meeting Intelligence recording workflow, `briefing session-plan` writes contract-valid `noted` manifests, and `briefing watch` keeps upcoming meeting manifests current and invokes `noted start --manifest` at pre-roll. After capture finishes, `briefing session-ingest` reads `completion.json` first and writes the managed post-meeting summary. If a transcript or summary needs to be rerun, `briefing session-reprocess` uses the existing session directory.
 
 If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends a managed `## Meeting Summary` block with an LLM-generated post-meeting summary; re-running ingest replaces only that block.
 
@@ -31,7 +31,7 @@ Only meetings you have explicitly configured are processed. If a required source
 ## Current Capabilities
 
 - Python `3.13+` application managed with `uv`
-- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-plan`, `briefing watch`, `briefing session-ingest`
+- CLI commands: `briefing run`, `briefing validate`, `briefing init-series`, `briefing session-plan`, `briefing watch`, `briefing session-ingest`, `briefing session-reprocess`
 - Apple Calendar ingestion via EventKit
 - Explicit series configuration under `user_config/series/*.yaml`
 - Sources: `previous_note`, `slack`, `notion`, `file`, `email`
@@ -39,11 +39,12 @@ Only meetings you have explicitly configured are processed. If a required source
 - Local state and diagnostics under `state/`
 - `launchd` helper scripts for unattended batch and watcher runs
 
-Completed Meeting Intelligence polish:
+Meeting Intelligence recording support:
 
-- automatic `noted` ingest handoff from the capture agent
-- cross-boundary diagnostics and formal smoke script/runbook
-- operator dry-runs and expanded user docs for the recording workflow
+- Meeting Intelligence `validate` preflight for local paths, EventKit, LLM provider readiness, source credentials, and `noted` availability.
+- Automatic `noted` ingest handoff after capture completion.
+- Dry-run modes for watch planning and session ingest.
+- Recovery path through `session-reprocess`.
 
 ## Quickstart
 
@@ -69,7 +70,7 @@ Supported LLM CLIs:
 
 This installs dependencies, creates the local runtime directories, bootstraps `user_config/settings.toml` if needed, and validates the configured LLM provider when possible.
 
-The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you want a different provider, edit `user_config/settings.toml` and rerun `./scripts/setup.sh`. Note: model name format is provider-specific — the `claude` CLI expects dash-separated IDs (e.g. `claude-sonnet-4-5`), not dot-separated.
+The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you want a different provider, edit `user_config/settings.toml` and rerun `./scripts/setup.sh`. Note: model name format is provider-specific - the `claude` CLI expects dash-separated IDs (e.g. `claude-sonnet-4-5`), not dot-separated.
 
 ### 2. Edit `user_config/settings.toml`
 
@@ -153,11 +154,13 @@ To inspect a single manifest plan:
 uv run briefing session-plan --event-id "EVENT-UID-HERE"
 ```
 
-After a `noted` session finishes, `noted` normally invokes ingest automatically. Operators can still inspect or rerun the handoff manually:
+After a `noted` session finishes, `noted` normally invokes ingest automatically. Operators can still inspect, rerun, or reprocess the handoff manually:
 
 ```bash
 uv run briefing session-ingest --session-dir /path/to/session --dry-run
 uv run briefing session-ingest --session-dir /path/to/session
+uv run briefing session-reprocess --session-dir /path/to/session --dry-run
+uv run briefing session-reprocess --session-dir /path/to/session
 ```
 
 The repeatable local smoke harness is:

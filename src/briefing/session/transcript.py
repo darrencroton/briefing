@@ -1,4 +1,4 @@
-"""Transcript source adapter (B-14).
+"""Transcript source adapter.
 
 Reads ``transcript/transcript.txt`` first; later work can extend this to parse
 ``transcript.json`` for structured segments without changing the prompt shape.

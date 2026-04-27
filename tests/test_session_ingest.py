@@ -1,4 +1,4 @@
-"""Fixture-driven tests for the session-ingest path (B-20)."""
+"""Fixture-driven tests for the session-ingest path."""
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ def _write_session(
 
 
 # ---------------------------------------------------------------------------
-# B-12 completion reader
+# Completion reader
 # ---------------------------------------------------------------------------
 
 
@@ -155,7 +155,7 @@ def test_completion_reader_rejects_schema_violation(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# decide() — partial-context policy (B-18)
+# Partial-context policy
 # ---------------------------------------------------------------------------
 
 
@@ -173,7 +173,7 @@ def test_decide_maps_each_fixture_to_expected_bucket(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# B-13 manifest loader
+# Manifest loader
 # ---------------------------------------------------------------------------
 
 
@@ -201,7 +201,7 @@ def test_manifest_loader_rejects_invalid_payload(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# B-14 transcript adapter
+# Transcript adapter
 # ---------------------------------------------------------------------------
 
 
@@ -225,7 +225,7 @@ def test_transcript_adapter_empty(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# B-17 managed summary block writer
+# Managed summary block writer
 # ---------------------------------------------------------------------------
 
 
@@ -381,7 +381,7 @@ def test_summary_block_rejects_notes_without_meeting_notes_section(tmp_path: Pat
 
 
 # ---------------------------------------------------------------------------
-# End-to-end ingest (B-18, B-19)
+# End-to-end ingest
 # ---------------------------------------------------------------------------
 
 

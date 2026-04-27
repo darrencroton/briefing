@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEV_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 NOTED_CMD="${NOTED_CMD:-noted}"
 SMOKE_ROOT="${BRIEFING_SMOKE_ROOT:-/tmp/meeting-intelligence-smoke}"
 SESSION_ID="smoke-$(date +%Y%m%d%H%M%S)"
@@ -14,7 +13,7 @@ WAIT_SECONDS="${WAIT_SECONDS:-180}"
 
 mkdir -p "$SESSION_DIR" "$(dirname "$NOTE_PATH")"
 
-python3 - "$DEV_ROOT/contracts/fixtures/manifests/valid-inperson.json" "$MANIFEST_PATH" "$SESSION_ID" "$SESSION_DIR" "$NOTE_PATH" <<'PY'
+python3 - "$ROOT_DIR/vendor/contracts/contracts/fixtures/manifests/valid-inperson.json" "$MANIFEST_PATH" "$SESSION_ID" "$SESSION_DIR" "$NOTE_PATH" <<'PY'
 import json
 import sys
 from datetime import datetime, timedelta

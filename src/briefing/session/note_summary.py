@@ -1,4 +1,4 @@
-"""Managed post-meeting `## Meeting Summary` block writer (B-17).
+"""Managed post-meeting `## Meeting Summary` block writer.
 
 Guardrail 6: user content in the Obsidian note must be byte-identical across
 rewrites. We mark the machine-managed region with HTML comments keyed by

@@ -75,14 +75,14 @@ def _reprocess(
 ) -> IngestResult:
     LOGGER.info("Starting session reprocess for %s dry_run=%s", session_dir, dry_run)
 
-    # Load manifest — required.
+    # Load manifest - required.
     try:
         loaded = load_session(session_dir, completion=None)
     except SessionLoadError as exc:
         LOGGER.error("Session load failed: %s", exc)
         return error_result(session_dir, exc.exit_code, str(exc), dry_run=dry_run)
 
-    # Load completion if present — used for richer prompt context when available.
+    # Load completion if present - used for richer prompt context when available.
     completion: Completion | None = None
     completion_path = session_dir / "outputs" / "completion.json"
     if completion_path.exists():
@@ -91,7 +91,7 @@ def _reprocess(
         except Exception as exc:
             LOGGER.info("completion.json exists but could not be parsed (%s); using synthetic context", exc)
 
-    # Load transcript — required.
+    # Load transcript - required.
     try:
         transcript = load_transcript(loaded.transcript_text_path)
     except TranscriptError as exc:
