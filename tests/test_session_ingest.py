@@ -438,6 +438,24 @@ def test_ingest_dry_run_generates_summary_without_writing_note(app_settings, tmp
     assert not fx.note_path.exists()
 
 
+def test_ingest_prompt_receives_diarized_speaker_labels(app_settings, tmp_path: Path) -> None:
+    transcript = (
+        "noted session test\n\n"
+        "[00:00.000-00:01.200] speaker_0: I will write the proposal.\n"
+        "[00:01.300-00:02.400] speaker_1: I will review it tomorrow.\n"
+    )
+    fx = _write_session(tmp_path, "completed.json", transcript=transcript)
+    provider = StubProvider()
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=provider)
+
+    assert result.ok
+    assert provider.prompts
+    assert "speaker_0: I will write the proposal." in provider.prompts[0]
+    assert "speaker_1: I will review it tomorrow." in provider.prompts[0]
+    assert "Diarization produced speaker labels" in provider.prompts[0]
+
+
 def test_ingest_completed_with_warnings_uses_speaker_agnostic_attribution(
     app_settings, tmp_path: Path
 ) -> None:
