@@ -142,7 +142,7 @@ Only after validation and a successful manual run should you install automation 
 
 ### 7. Optional: plan and watch recorded meetings
 
-After `noted` is installed and permissioned, dry-run one watch cycle:
+After `noted` is installed and on `PATH`, dry-run one watch cycle:
 
 ```bash
 uv run briefing watch --once --dry-run
