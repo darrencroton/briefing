@@ -168,6 +168,21 @@ class EventKitClient:
 
     def __init__(self, settings: AppSettings):
         self.settings = settings
+        self._store = None
+        self._access_granted = False
+
+    def _event_store(self):
+        """Return the long-lived EventKit store for this client."""
+        if self._store is None:
+            self._store = _get_event_store()
+        return self._store
+
+    def _ensure_access(self, store) -> None:
+        """Request EventKit access once for this client."""
+        if self._access_granted:
+            return
+        _request_access(store)
+        self._access_granted = True
 
     def _get_calendars(self, store):
         """Resolve the calendar objects to query based on include/exclude settings."""
@@ -188,8 +203,8 @@ class EventKitClient:
 
     def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
         """Fetch events in a specific window."""
-        store = _get_event_store()
-        _request_access(store)
+        store = self._event_store()
+        self._ensure_access(store)
         calendars = self._get_calendars(store)
         predicate = store.predicateForEventsWithStartDate_endDate_calendars_(
             _ns_date(start), _ns_date(end), calendars
@@ -218,8 +233,8 @@ class EventKitClient:
     def validate_access(self) -> tuple[bool, str]:
         """Check that EventKit can access the Calendar store."""
         try:
-            store = _get_event_store()
-            _request_access(store)
+            store = self._event_store()
+            self._ensure_access(store)
             return True, "EventKit calendar access granted"
         except CalendarError as exc:
             return False, str(exc)

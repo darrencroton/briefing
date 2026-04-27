@@ -201,6 +201,31 @@ def test_eventkit_client_fetch_events_filters_all_day(app_settings) -> None:
     assert events[0].uid == "normal-1"
 
 
+def test_eventkit_client_reuses_event_store_and_access_grant(app_settings) -> None:
+    normal_event = _make_ek_event(uid="normal-1", is_all_day=False)
+    fake_store = SimpleNamespace(
+        predicateForEventsWithStartDate_endDate_calendars_=lambda s, e, c: "predicate",
+        eventsMatchingPredicate_=lambda p: [normal_event],
+        calendarsForEntityType_=lambda t: [],
+    )
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store) as get_store, \
+         patch("briefing.calendar._request_access") as request_access, \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings)
+        client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+        client.fetch_events(
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+            datetime(2026, 4, 15, tzinfo=timezone.utc),
+        )
+
+    get_store.assert_called_once_with()
+    request_access.assert_called_once_with(fake_store)
+
+
 def test_eventkit_client_fetch_events_includes_all_day_when_configured(app_settings) -> None:
     app_settings.calendar.include_all_day = True
     all_day_event = _make_ek_event(uid="all-day-1", is_all_day=True)

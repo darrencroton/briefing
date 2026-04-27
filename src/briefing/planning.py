@@ -324,12 +324,14 @@ def plan_blocks_replanning(plan: SessionPlanState) -> bool:
 
 
 def plan_allows_replanning_for_event(plan: SessionPlanState, event: MeetingEvent) -> bool:
-    """Return whether an invalidated plan is scoped to an old start/session."""
+    """Return whether a stored plan is scoped to an old start/session."""
     return (
-        plan.status == "invalidated"
-        and plan.invalidation_reason in {"event_cancelled", "event_rescheduled_out_of_tolerance"}
-        and plan.start_iso != event.start.isoformat()
-    )
+        (
+            plan.status == "invalidated"
+            and plan.invalidation_reason in {"event_cancelled", "event_rescheduled_out_of_tolerance"}
+        )
+        or plan.status == "launch_failed"
+    ) and plan.start_iso != event.start.isoformat()
 
 
 def _result_from_existing_plan(

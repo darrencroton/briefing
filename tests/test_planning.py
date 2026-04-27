@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -461,6 +462,53 @@ def test_invalidation_sweep_rewrites_in_tolerance_reschedule_in_place(app_settin
     plans = StateStore(app_settings).list_session_plans()
     assert len(plans) == 1
     assert plans[0].note_path == rewritten["paths"]["note_path"]
+
+
+def test_plan_event_replans_launch_failed_when_event_start_changes(app_settings) -> None:
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+        },
+    )
+    event = _event()
+    result = plan_event(
+        app_settings,
+        event,
+        events=[event],
+        now=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+    )
+    assert result.manifest_path is not None
+
+    store = StateStore(app_settings)
+    plan = store.load_session_plan_for_event(event)
+    assert plan is not None
+    store.save_session_plan(
+        replace(
+            plan,
+            status="launch_failed",
+            launched_at="2026-04-13T09:58:40+10:00",
+            launch_exit_code=6,
+        )
+    )
+
+    moved = _event(start="2026-04-13T10:20:00+10:00")
+    replanned = plan_event(
+        app_settings,
+        moved,
+        events=[moved],
+        now=datetime.fromisoformat("2026-04-13T10:18:30+10:00"),
+    )
+
+    assert replanned.status == "planned"
+    assert replanned.manifest_path is not None
+    assert replanned.manifest_path != result.manifest_path
+    assert json.loads(Path(replanned.manifest_path).read_text(encoding="utf-8"))["meeting"]["start_time"] == (
+        "2026-04-13T10:20:00+10:00"
+    )
 
 
 def test_plan_event_no_orphaned_state_when_primary_write_fails(app_settings) -> None:
