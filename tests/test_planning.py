@@ -511,6 +511,56 @@ def test_plan_event_replans_launch_failed_when_event_start_changes(app_settings)
     )
 
 
+def test_plan_event_replans_launched_when_event_uid_reused_at_new_start(app_settings) -> None:
+    """macOS Calendar 'copy event' reuses the event UID. A plan with status=launched must not
+    block a new occurrence at a different start time."""
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+        },
+    )
+    event = _event()
+    result = plan_event(
+        app_settings,
+        event,
+        events=[event],
+        now=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+    )
+    assert result.manifest_path is not None
+
+    store = StateStore(app_settings)
+    plan = store.load_session_plan_for_event(event)
+    assert plan is not None
+    store.save_session_plan(
+        replace(
+            plan,
+            status="launched",
+            launched_at="2026-04-13T09:58:40+10:00",
+            launch_exit_code=0,
+        )
+    )
+
+    # Same UID, different start — simulates "copy event" in macOS Calendar.
+    copied = _event(start="2026-04-13T11:00:00+10:00")
+    replanned = plan_event(
+        app_settings,
+        copied,
+        events=[copied],
+        now=datetime.fromisoformat("2026-04-13T10:58:30+10:00"),
+    )
+
+    assert replanned.status == "planned"
+    assert replanned.manifest_path is not None
+    assert replanned.manifest_path != result.manifest_path
+    assert json.loads(Path(replanned.manifest_path).read_text(encoding="utf-8"))["meeting"]["start_time"] == (
+        "2026-04-13T11:00:00+10:00"
+    )
+
+
 def test_plan_event_no_orphaned_state_when_primary_write_fails(app_settings) -> None:
     _write_series(
         app_settings,

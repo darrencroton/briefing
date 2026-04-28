@@ -324,14 +324,20 @@ def plan_blocks_replanning(plan: SessionPlanState) -> bool:
 
 
 def plan_allows_replanning_for_event(plan: SessionPlanState, event: MeetingEvent) -> bool:
-    """Return whether a stored plan is scoped to an old start/session."""
+    """Return whether a stored plan is scoped to a different occurrence and may be superseded.
+
+    A different start time always permits replanning: the event UID is reused when macOS Calendar
+    copies an event, so the same UID can legitimately refer to a new occurrence at a new time.
+    """
+    if plan.start_iso != event.start.isoformat():
+        return True
     return (
         (
             plan.status == "invalidated"
             and plan.invalidation_reason in {"event_cancelled", "event_rescheduled_out_of_tolerance"}
         )
         or plan.status == "launch_failed"
-    ) and plan.start_iso != event.start.isoformat()
+    )
 
 
 def _result_from_existing_plan(
