@@ -35,7 +35,7 @@ from .ingest import (
 )
 from .loader import LoadedSession, SessionLoadError, load_session
 from .note_summary import write_summary_block
-from .prompt import PromptInputs, load_pre_meeting_briefing
+from .prompt import PromptInputs, load_meeting_note_context
 from .summary import SummaryGenerationError, generate_summary
 from .transcript import TranscriptError, load_transcript
 
@@ -117,7 +117,7 @@ def _reprocess(
                 manifest=loaded.manifest,
                 completion=effective_completion,
                 transcript=transcript,
-                briefing_context=load_pre_meeting_briefing(loaded.note_path),
+                meeting_note_context=load_meeting_note_context(loaded.note_path),
             ),
             debug_key=f"{loaded.manifest.session_id}-reprocess",
         )

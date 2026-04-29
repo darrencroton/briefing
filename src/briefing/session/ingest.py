@@ -40,7 +40,7 @@ from .completion import (
 )
 from .loader import LoadedSession, SessionLoadError, load_session
 from .note_summary import MissingNoteTemplate, NoteWriteResult, write_summary_block
-from .prompt import PromptInputs, load_pre_meeting_briefing
+from .prompt import PromptInputs, load_meeting_note_context
 from .summary import SummaryGenerationError, generate_summary
 from .transcript import Transcript, TranscriptError, load_transcript
 
@@ -247,7 +247,7 @@ def _run(
                 manifest=loaded.manifest,
                 completion=completion,
                 transcript=transcript,
-                briefing_context=load_pre_meeting_briefing(loaded.note_path),
+                meeting_note_context=load_meeting_note_context(loaded.note_path),
             ),
             debug_key=completion.session_id,
         )

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..notes import extract_section
 from ..utils import render_template
 from .completion import Completion
 from .loader import Manifest
@@ -19,7 +19,7 @@ class PromptInputs:
     manifest: Manifest
     completion: Completion
     transcript: Transcript
-    briefing_context: str = "not available"
+    meeting_note_context: str = "not available"
 
 
 def render_post_meeting_prompt(template_text: str, inputs: PromptInputs) -> str:
@@ -32,20 +32,50 @@ def render_post_meeting_prompt(template_text: str, inputs: PromptInputs) -> str:
             "WARNINGS": _build_warnings(inputs.completion),
             "TRANSCRIPT": inputs.transcript.text.strip(),
             "ATTRIBUTION_POLICY": _build_attribution_policy(inputs.completion, inputs.manifest),
-            "PRE_MEETING_BRIEFING": inputs.briefing_context.strip() or "not available",
+            "MEETING_NOTE": inputs.meeting_note_context.strip() or "not available",
         },
     )
 
 
-def load_pre_meeting_briefing(note_path: Path) -> str:
-    """Load the existing managed briefing block as post-meeting context."""
+def load_meeting_note_context(note_path: Path) -> str:
+    """Load the current meeting note as post-meeting context.
+
+    Existing generated summaries are excluded so reprocess does not feed the
+    previous `## Meeting Summary` back into the next summary generation.
+    """
     if not note_path.exists():
         return "not available"
     try:
         note_text = note_path.read_text(encoding="utf-8")
     except OSError:
         return "not available"
-    return extract_section(note_text, "Briefing") or "not available"
+    return _remove_existing_summary(note_text).strip() or "not available"
+
+
+_SUMMARY_HEADING_PATTERN = re.compile(r"^## Meeting Summary\n", re.MULTILINE)
+_NEXT_HEADING_PATTERN = re.compile(r"^## [^\n]+\n", re.MULTILINE)
+
+
+def _remove_existing_summary(note_text: str) -> str:
+    """Remove the existing managed summary block from prompt context, if present."""
+    matches = list(_SUMMARY_HEADING_PATTERN.finditer(note_text))
+    if not matches:
+        return note_text
+    heading = matches[-1]
+    start = _include_immediate_divider(note_text, heading.start())
+    next_heading = _NEXT_HEADING_PATTERN.search(note_text, heading.end())
+    end = next_heading.start() if next_heading else len(note_text)
+    return note_text[:start] + note_text[end:]
+
+
+def _include_immediate_divider(note_text: str, heading_start: int) -> int:
+    divider_start = heading_start - len("---\n")
+    if divider_start >= 0 and note_text[divider_start:heading_start] == "---\n":
+        return divider_start
+    divider_start = heading_start - len("\n---\n")
+    if divider_start >= 0 and note_text[divider_start:heading_start] == "\n---\n":
+        return divider_start
+    return heading_start
 
 
 def _build_meeting_context(manifest: Manifest, completion: Completion) -> str:

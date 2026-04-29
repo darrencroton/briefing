@@ -395,6 +395,44 @@ def test_ingest_completed_writes_summary_block(app_settings, tmp_path: Path) -> 
     assert (fx.session_dir / "logs" / "briefing.log").exists()
 
 
+def test_ingest_prompt_receives_meeting_note_context(app_settings, tmp_path: Path) -> None:
+    note_seed = (
+        "---\ntitle: Weekly Product Review\n---\n"
+        "# Weekly Product Review\n\n"
+        "---\n## Briefing\n\n- Prior context: Dhruba is testing run M12.\n\n"
+        "---\n## Meeting Notes\n\n- In-meeting note: M12 needs a lower timestep.\n"
+    )
+    fx = _write_session(tmp_path, "completed.json", note_seed=note_seed)
+    provider = StubProvider()
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=provider)
+
+    assert result.ok
+    assert provider.prompts
+    prompt = provider.prompts[0]
+    assert "Prior context: Dhruba is testing run M12." in prompt
+    assert "In-meeting note: M12 needs a lower timestep." in prompt
+
+
+def test_ingest_prompt_excludes_existing_generated_summary(app_settings, tmp_path: Path) -> None:
+    note_seed = (
+        "---\ntitle: Weekly Product Review\n---\n"
+        "# Weekly Product Review\n\n"
+        "---\n## Briefing\n\n- Prior context\n\n"
+        "---\n## Meeting Notes\n\n- User note stays in context.\n\n"
+        "---\n## Meeting Summary\n\n- Old generated summary should not be sent back.\n"
+    )
+    fx = _write_session(tmp_path, "completed.json", note_seed=note_seed)
+    provider = StubProvider()
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=provider)
+
+    assert result.ok
+    prompt = provider.prompts[0]
+    assert "User note stays in context." in prompt
+    assert "Old generated summary should not be sent back." not in prompt
+
+
 def test_ingest_boundary_logs_include_manifest_identity(
     app_settings,
     tmp_path: Path,

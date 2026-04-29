@@ -41,6 +41,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
         "Warnings: {{WARNINGS}}\n"
         "Meeting:\n{{MEETING_CONTEXT}}\n\n"
         "Participants:\n{{PARTICIPANTS}}\n\n"
+        "Meeting note:\n{{MEETING_NOTE}}\n\n"
         "Transcript:\n{{TRANSCRIPT}}\n",
         encoding="utf-8",
     )

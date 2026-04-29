@@ -4,7 +4,8 @@ Generate only the Markdown body for the `## Meeting Summary` section. Do not out
 
 Core goal:
 - Produce a brief, dense project record. A scientifically literate reader should be able to recover what progressed, technical nuances, decisions made, open risks, and next steps.
-- Use the meeting context and participant hints only to decode the transcript. Do not invent updates for context items unless they were discussed in the transcript.
+- Use the meeting note, meeting context, and participant hints only to decode the transcript. The meeting note may include the pre-meeting briefing and in-meeting notes. Do not invent updates for context items unless they were discussed in the transcript.
+- Cross-reference the meeting note to decode messy transcript text: map ambiguous names or terms, fix acronyms, and clarify technical parameters when the transcript supports that interpretation.
 
 Style and accuracy rules:
 - Keep it comfortably under one A4 page.
@@ -24,8 +25,8 @@ Transcript warnings: {{WARNINGS}}
 Meeting context:
 {{MEETING_CONTEXT}}
 
-Pre-meeting briefing:
-{{PRE_MEETING_BRIEFING}}
+Meeting note context:
+{{MEETING_NOTE}}
 
 Participant hints:
 {{PARTICIPANTS}}
