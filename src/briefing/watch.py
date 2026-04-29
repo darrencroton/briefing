@@ -191,9 +191,10 @@ def _plan_and_maybe_launch(
 
     command = [settings.meeting_intelligence.noted_command, "start", "--manifest", result.manifest_path]
     completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    launch_status = _launch_status_from_noted_start(completed, expected_session_id=result.session_id)
     updated = replace(
         plan,
-        status="launched" if completed.returncode == 0 else "launch_failed",
+        status=launch_status,
         launched_at=now.isoformat(),
         launch_exit_code=completed.returncode,
     )
@@ -233,3 +234,25 @@ def _plan_and_maybe_launch(
             sort_keys=True,
         ),
     )
+
+
+def _launch_status_from_noted_start(
+    completed: subprocess.CompletedProcess[str],
+    *,
+    expected_session_id: str,
+) -> str:
+    if completed.returncode == 0:
+        return "launched"
+    if completed.returncode != 5:
+        return "launch_failed"
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return "launch_failed"
+    if (
+        isinstance(payload, dict)
+        and payload.get("error") == "session_already_running"
+        and payload.get("session_id") == expected_session_id
+    ):
+        return "launched"
+    return "launch_failed"

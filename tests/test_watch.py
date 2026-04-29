@@ -284,6 +284,101 @@ def test_watch_does_not_relaunch_after_prior_launch_attempt(
     assert plans[0].launched_at is not None
 
 
+def test_watch_treats_matching_session_already_running_as_launched(
+    monkeypatch,
+    app_settings,
+) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+
+    def fake_run(command, **kwargs):
+        return SimpleNamespace(
+            returncode=5,
+            stdout='{"ok":false,"error":"session_already_running","session_id":"2026-04-13T100000+1000-cas-strategy-meeting"}',
+            stderr="",
+        )
+
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run)
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+    )
+
+    assert exit_code == 0
+    plans = StateStore(app_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].status == "launched"
+    assert plans[0].launch_exit_code == 5
+    assert plans[0].launched_at is not None
+
+
+def test_watch_keeps_unrelated_session_already_running_as_launch_failed(
+    monkeypatch,
+    app_settings,
+) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+
+    def fake_run(command, **kwargs):
+        return SimpleNamespace(
+            returncode=5,
+            stdout='{"ok":false,"error":"session_already_running","session_id":"different-session"}',
+            stderr="",
+        )
+
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run)
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+    )
+
+    assert exit_code == 0
+    plans = StateStore(app_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].status == "launch_failed"
+    assert plans[0].launch_exit_code == 5
+
+
 def test_watch_launches_rewritten_reschedule_plan_without_duplicate(
     monkeypatch,
     app_settings,
