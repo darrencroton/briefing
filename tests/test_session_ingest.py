@@ -225,7 +225,7 @@ def test_transcript_adapter_empty(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Managed summary block writer
+# Managed summary section writer
 # ---------------------------------------------------------------------------
 
 
@@ -255,13 +255,12 @@ def test_summary_block_appends_after_meeting_notes_and_preserves_user_content(tm
     text = fx.note_path.read_text(encoding="utf-8")
     assert user_line in text
     assert SUMMARY_HEADING in text
-    assert "MEETING-SUMMARY:start" in text
-    assert "MEETING-SUMMARY:end" in text
+    assert text.rstrip().endswith("## Meeting Summary\n\n- Decision: ship v2 on 2026-05-15")
     # Briefing stays intact
     assert "Prior briefing bullet" in text
 
 
-def test_summary_block_preserves_blank_lines_before_following_heading(tmp_path: Path) -> None:
+def test_summary_block_appends_to_end_and_preserves_following_user_sections(tmp_path: Path) -> None:
     note_seed = (
         "---\ntitle: Weekly Product Review\n---\n"
         "# Weekly Product Review\n\n"
@@ -284,10 +283,8 @@ def test_summary_block_preserves_blank_lines_before_following_heading(tmp_path: 
     )
 
     text = fx.note_path.read_text(encoding="utf-8")
-    marker = "<!-- MEETING-SUMMARY:start"
-    insertion_point = note_seed.index("## Decisions")
-    assert text[: text.index(marker)] == note_seed[:insertion_point]
-    assert text[text.index("## Decisions") :] == note_seed[insertion_point:]
+    assert text.startswith(note_seed)
+    assert text.rstrip().endswith("## Meeting Summary\n\n- Summary bullet")
 
 
 def test_summary_block_replaces_existing_managed_block_only(tmp_path: Path) -> None:
@@ -321,11 +318,10 @@ def test_summary_block_replaces_existing_managed_block_only(tmp_path: Path) -> N
     final = fx.note_path.read_text(encoding="utf-8")
 
     # User region (everything up to the managed block) is byte-identical
-    marker = "<!-- MEETING-SUMMARY:start"
+    marker = "---\n## Meeting Summary"
     assert intermediate[: intermediate.index(marker)] == final[: final.index(marker)]
     assert "- new summary" in final
     assert "- old summary" not in final
-    assert 'transcript_sha256="hash-two"' in final
 
 
 def test_summary_block_creates_missing_note_from_manifest(tmp_path: Path) -> None:
@@ -551,7 +547,7 @@ def test_ingest_reingest_replaces_existing_block_without_touching_user_content(
     assert second.block_replaced is True
     second_text = fx.note_path.read_text(encoding="utf-8")
 
-    marker = "<!-- MEETING-SUMMARY:start"
+    marker = "---\n## Meeting Summary"
     assert first_text[: first_text.index(marker)] == second_text[: second_text.index(marker)]
     assert "- Hand-written note line" in second_text
     assert "- second ingest bullet" in second_text

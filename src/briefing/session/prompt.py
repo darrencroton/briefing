@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from ..notes import extract_section
 from ..utils import render_template
 from .completion import Completion
 from .loader import Manifest
@@ -17,6 +19,7 @@ class PromptInputs:
     manifest: Manifest
     completion: Completion
     transcript: Transcript
+    briefing_context: str = "not available"
 
 
 def render_post_meeting_prompt(template_text: str, inputs: PromptInputs) -> str:
@@ -29,8 +32,20 @@ def render_post_meeting_prompt(template_text: str, inputs: PromptInputs) -> str:
             "WARNINGS": _build_warnings(inputs.completion),
             "TRANSCRIPT": inputs.transcript.text.strip(),
             "ATTRIBUTION_POLICY": _build_attribution_policy(inputs.completion, inputs.manifest),
+            "PRE_MEETING_BRIEFING": inputs.briefing_context.strip() or "not available",
         },
     )
+
+
+def load_pre_meeting_briefing(note_path: Path) -> str:
+    """Load the existing managed briefing block as post-meeting context."""
+    if not note_path.exists():
+        return "not available"
+    try:
+        note_text = note_path.read_text(encoding="utf-8")
+    except OSError:
+        return "not available"
+    return extract_section(note_text, "Briefing") or "not available"
 
 
 def _build_meeting_context(manifest: Manifest, completion: Completion) -> str:

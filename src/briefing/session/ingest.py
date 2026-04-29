@@ -2,7 +2,7 @@
 
 Reads the completion file first, applies the partial-context policy from
 the partial-context policy, then - when a summary is warranted - loads the transcript,
-invokes the LLM, and writes the managed `## Meeting Summary` block.
+invokes the LLM, and writes the managed `## Meeting Summary` section.
 
 Exit codes are stable for ``noted`` to consume:
 
@@ -40,7 +40,7 @@ from .completion import (
 )
 from .loader import LoadedSession, SessionLoadError, load_session
 from .note_summary import MissingNoteTemplate, NoteWriteResult, write_summary_block
-from .prompt import PromptInputs
+from .prompt import PromptInputs, load_pre_meeting_briefing
 from .summary import SummaryGenerationError, generate_summary
 from .transcript import Transcript, TranscriptError, load_transcript
 
@@ -247,6 +247,7 @@ def _run(
                 manifest=loaded.manifest,
                 completion=completion,
                 transcript=transcript,
+                briefing_context=load_pre_meeting_briefing(loaded.note_path),
             ),
             debug_key=completion.session_id,
         )
@@ -264,7 +265,7 @@ def _run(
             dry_run=dry_run,
         )
 
-    # Step 6: managed summary-block write.
+    # Step 6: managed summary-section write.
     if dry_run:
         LOGGER.info(
             "Dry-run note write skipped: path=%s session_id=%s transcript_sha256=%s",

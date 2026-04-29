@@ -98,7 +98,7 @@ The previous-note summariser looks at the note structure that `briefing` writes:
 - `## Briefing`
 - `## Meeting Notes`
 
-Normal user editing from `Meeting Notes` onward is expected and useful. That whole tail of the note is part of what makes the previous-note source valuable, including additional same-level sections such as `## Transcript Summary`.
+Normal user editing from `Meeting Notes` onward is expected and useful. That whole tail of the note is part of what makes the previous-note source valuable, including later same-level sections such as `## Meeting Summary`.
 
 The prior generated `## Briefing` is not fed back into the next run. This avoids summary-on-summary drift and keeps continuity grounded in user-owned note content.
 

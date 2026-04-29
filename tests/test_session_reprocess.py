@@ -121,11 +121,10 @@ def test_reprocess_without_completion_uses_synthetic(tmp_path: Path, app_setting
 
 
 def test_reprocess_replaces_existing_summary_block(tmp_path: Path, app_settings) -> None:
-    """Re-running reprocess replaces the existing managed block, not appends."""
+    """Re-running reprocess replaces the existing managed section, not appends."""
     existing_block = (
-        '<!-- MEETING-SUMMARY:start session_id="old" transcript_sha256="abc" -->\n'
+        "---\n"
         "## Meeting Summary\n\n- old summary\n"
-        "<!-- MEETING-SUMMARY:end -->"
     )
     note_seed = (
         "---\ntitle: Test\n---\n\n## Briefing\n\n- ctx\n\n## Meeting Notes\n\nmy notes\n\n"
@@ -139,8 +138,9 @@ def test_reprocess_replaces_existing_summary_block(tmp_path: Path, app_settings)
 
     assert result.ok
     note_content = fx.note_path.read_text(encoding="utf-8")
-    assert note_content.count("MEETING-SUMMARY:start") == 1
+    assert note_content.count("## Meeting Summary") == 1
     assert "new summary line" in note_content
+    assert "old summary" not in note_content
 
 
 def test_reprocess_dry_run_does_not_write(tmp_path: Path, app_settings) -> None:

@@ -35,7 +35,7 @@ If diarization was unavailable or produced `diarization_ok: false`, set both to 
 
 ### End-to-end latency
 
-Time in seconds from `completion.json.completed_at` to the summary block appearing in the Obsidian note.  
+Time in seconds from `completion.json.completed_at` to the `## Meeting Summary` section appearing in the Obsidian note.  
 *Target: no more than 300 s for a one-hour meeting.*
 
 ---

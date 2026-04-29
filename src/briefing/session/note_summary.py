@@ -1,9 +1,8 @@
-"""Managed post-meeting `## Meeting Summary` block writer.
+"""Managed post-meeting `## Meeting Summary` section writer.
 
 Guardrail 6: user content in the Obsidian note must be byte-identical across
-rewrites. We mark the machine-managed region with HTML comments keyed by
-``session_id`` and ``transcript_sha256`` so the block can be replaced on
-re-ingest without touching any other bytes.
+rewrites. The visible ``## Meeting Summary`` heading is the managed boundary;
+re-ingest replaces that section and leaves all surrounding bytes unchanged.
 """
 
 from __future__ import annotations
@@ -19,13 +18,9 @@ from .loader import Manifest
 
 SUMMARY_HEADING = "## Meeting Summary"
 
-_SUMMARY_BLOCK_PATTERN = re.compile(
-    r"<!-- MEETING-SUMMARY:start[^>]*-->.*?<!-- MEETING-SUMMARY:end -->",
-    re.DOTALL,
-)
-
 _MEETING_NOTES_PATTERN = re.compile(r"^## Meeting Notes\n", re.MULTILINE)
 _NEXT_HEADING_PATTERN = re.compile(r"^## [^\n]+\n", re.MULTILINE)
+_SUMMARY_HEADING_PATTERN = re.compile(r"^## Meeting Summary\n", re.MULTILINE)
 
 
 @dataclass(slots=True)
@@ -55,19 +50,19 @@ def write_summary_block(
     transcript_sha256: str,
     missing_note_template: MissingNoteTemplate | None = None,
 ) -> NoteWriteResult:
-    """Create or update the managed `## Meeting Summary` block in the note.
+    """Create or update the managed `## Meeting Summary` section in the note.
 
     - If the note does not exist, renders the configured meeting-note template
-      from the manifest and inserts the managed block.
-    - If the note exists with a `## Meeting Notes` section, inserts the block
-      immediately before the next `##` heading (or at end-of-file).
-    - If a managed block is already present, replaces only that block.
+      from the manifest and appends the managed section.
+    - If the note exists with a `## Meeting Notes` section, appends the section
+      to the end of the note.
+    - If a managed section is already present, replaces only that section and
+      appends the new version to the end.
     """
     block = _render_managed_block(
         summary_body=summary_body,
-        session_id=session_id,
-        transcript_sha256=transcript_sha256,
     )
+    _ = (session_id, transcript_sha256)
 
     if not note_path.exists():
         if missing_note_template is None:
@@ -76,7 +71,7 @@ def write_summary_block(
                 "a post-meeting summary can be inserted."
             )
         base_note = _render_missing_note_from_template(manifest, missing_note_template)
-        note_text = _insert_block_after_meeting_notes(base_note, block, note_path)
+        note_text = _append_summary_section(base_note, block)
         _write_note(note_path, note_text)
         return NoteWriteResult(
             note_path=note_path,
@@ -86,13 +81,13 @@ def write_summary_block(
         )
 
     existing_text = note_path.read_text(encoding="utf-8")
-    existing_match = _SUMMARY_BLOCK_PATTERN.search(existing_text)
-    if existing_match:
-        new_text = (
-            existing_text[: existing_match.start()]
-            + block
-            + existing_text[existing_match.end() :]
+    summary_range = _find_summary_section(existing_text)
+    if summary_range:
+        body_without_summary = (
+            existing_text[: summary_range[0]]
+            + existing_text[summary_range[1] :]
         )
+        new_text = _append_summary_section(body_without_summary, block)
         if new_text == existing_text:
             return NoteWriteResult(
                 note_path=note_path,
@@ -115,7 +110,7 @@ def write_summary_block(
             "cannot safely insert a post-meeting summary."
         )
 
-    new_text = _insert_block_after_meeting_notes(existing_text, block, note_path)
+    new_text = _append_summary_section(existing_text, block)
     _write_note(note_path, new_text)
     return NoteWriteResult(
         note_path=note_path,
@@ -125,17 +120,8 @@ def write_summary_block(
     )
 
 
-def _insert_block_after_meeting_notes(note_text: str, block: str, note_path: Path) -> str:
-    meeting_notes = _MEETING_NOTES_PATTERN.search(note_text)
-    if not meeting_notes:
-        raise NoteStructureError(
-            f"Note at {note_path} has no '## Meeting Notes' section; "
-            "cannot safely insert a post-meeting summary."
-        )
-    insertion_point = _find_insertion_point(note_text, meeting_notes.end())
-    prefix = note_text[:insertion_point]
-    suffix = note_text[insertion_point:]
-    return prefix + _prefix_separator(prefix) + block + _suffix_separator(suffix) + suffix
+def _append_summary_section(note_text: str, block: str) -> str:
+    return note_text + _prefix_separator(note_text) + block + "\n"
 
 
 def _prefix_separator(prefix: str) -> str:
@@ -148,38 +134,39 @@ def _prefix_separator(prefix: str) -> str:
     return "\n\n"
 
 
-def _suffix_separator(suffix: str) -> str:
-    if not suffix:
-        return "\n"
-    if suffix.startswith("\n\n"):
-        return ""
-    if suffix.startswith("\n"):
-        return "\n"
-    return "\n\n"
-
-
 def _render_managed_block(
     *,
     summary_body: str,
-    session_id: str,
-    transcript_sha256: str,
 ) -> str:
     normalised = summary_body.strip("\n")
     return (
-        f'<!-- MEETING-SUMMARY:start session_id="{session_id}" '
-        f'transcript_sha256="{transcript_sha256}" -->\n'
+        "---\n"
         f"{SUMMARY_HEADING}\n\n"
-        f"{normalised}\n"
-        f"<!-- MEETING-SUMMARY:end -->"
+        f"{normalised}"
     )
 
 
-def _find_insertion_point(note_text: str, search_from: int) -> int:
-    """Insert before the next level-2 heading, or at end-of-file."""
-    next_heading = _NEXT_HEADING_PATTERN.search(note_text, search_from)
+def _find_summary_section(note_text: str) -> tuple[int, int] | None:
+    """Return the visible managed-summary section range, if present."""
+    matches = list(_SUMMARY_HEADING_PATTERN.finditer(note_text))
+    if not matches:
+        return None
+    heading = matches[-1]
+    start = _include_immediate_divider(note_text, heading.start())
+    next_heading = _NEXT_HEADING_PATTERN.search(note_text, heading.end())
     if next_heading:
-        return next_heading.start()
-    return len(note_text)
+        return (start, next_heading.start())
+    return (start, len(note_text))
+
+
+def _include_immediate_divider(note_text: str, heading_start: int) -> int:
+    divider_start = heading_start - len("---\n")
+    if divider_start >= 0 and note_text[divider_start:heading_start] == "---\n":
+        return divider_start
+    divider_start = heading_start - len("\n---\n")
+    if divider_start >= 0 and note_text[divider_start:heading_start] == "\n---\n":
+        return divider_start
+    return heading_start
 
 
 def _render_missing_note_from_template(

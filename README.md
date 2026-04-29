@@ -24,7 +24,7 @@ When `briefing` runs (manually or via `launchd`), it:
 
 For the Meeting Intelligence recording workflow, `briefing session-plan` writes contract-valid `noted` manifests, and `briefing watch` keeps upcoming meeting manifests current and invokes `noted start --manifest` at pre-roll. After capture finishes, `briefing session-ingest` reads `completion.json` first and writes the managed post-meeting summary. If a transcript or summary needs to be rerun, `briefing session-reprocess` uses the existing session directory.
 
-If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends a managed `## Meeting Summary` block with an LLM-generated post-meeting summary; re-running ingest replaces only that block.
+If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends an LLM-generated `## Meeting Summary` section at the end of the note with a `---` divider above it; re-running ingest replaces only that section.
 
 Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
 

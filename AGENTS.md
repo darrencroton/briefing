@@ -27,7 +27,7 @@ briefing validate       # environment + noted preflight diagnostics
 briefing init-series    # bootstrap a new series YAML
 briefing session-plan   # write a manifest for one calendar event
 briefing watch          # long-running pre-roll planner / launcher
-briefing session-ingest # consume a completed noted session and write the summary block
+briefing session-ingest # consume a completed noted session and write the summary section
 briefing session-reprocess  # rerun summary from an existing transcript (recovery path)
 ```
 
@@ -38,7 +38,7 @@ The release soak checklist lives in `docs/soak-runbook-week1.md`.
 - Process only explicitly configured meeting series.
 - Match series with explicit rules, not title-only heuristics.
 - Keep occurrence state stable across event title changes.
-- Refresh only the managed `## Briefing` pre-meeting block (`briefing run`). Write and replace only the managed `## Meeting Summary` post-meeting block (`briefing session-ingest` and `briefing session-reprocess`).
+- Refresh only the managed `## Briefing` pre-meeting block (`briefing run`). Write and replace only the managed `## Meeting Summary` post-meeting section (`briefing session-ingest` and `briefing session-reprocess`).
 - Never touch user-owned content: `## Meeting Notes`, `Actions`, or any content between or after managed blocks.
 - Treat required source failures as blocking.
 - Prefer local-first operation and minimal moving parts.

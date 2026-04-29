@@ -31,7 +31,7 @@ The Meeting Intelligence recording flow adds:
 
 1. `briefing session-plan --event-id <id>` writes a contract-valid `manifest.json`
 2. `briefing watch` polls upcoming events, refreshes pre-written next manifests, and invokes `noted start --manifest <path>` at pre-roll
-3. `briefing session-ingest --session-dir <path>` reads `completion.json` and writes the managed `Meeting Summary` block
+3. `briefing session-ingest --session-dir <path>` reads `completion.json` and writes the managed `Meeting Summary` section
 4. `briefing session-reprocess --session-dir <path>` reruns summary generation from an existing completed session
 
 Important behavior:
@@ -145,7 +145,7 @@ To dry-run the long-lived recorder planner without launching `noted`:
 uv run briefing watch --once --dry-run
 ```
 
-To inspect a completed `noted` session before writing the managed summary block:
+To inspect a completed `noted` session before writing the managed summary section:
 
 ```bash
 uv run briefing session-ingest --session-dir /path/to/noted/session --dry-run
