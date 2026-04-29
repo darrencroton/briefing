@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import pytest
 import yaml
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -18,6 +19,11 @@ class FakeCalendar:
 
     def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
         return [event for event in self.events if start <= event.start <= end]
+
+
+@pytest.fixture(autouse=True)
+def no_noted_pause_marker(monkeypatch) -> None:
+    monkeypatch.setattr("briefing.watch._noted_scheduled_recording_paused", lambda: False)
 
 
 def test_watch_once_dry_run_plans_without_marking_launch(app_settings) -> None:
@@ -105,6 +111,128 @@ def test_watch_dry_run_does_not_block_later_real_launch(monkeypatch, app_setting
     assert exit_code == 0
     assert len(launches) == 1
     assert launches[0][:3] == [app_settings.meeting_intelligence.noted_command, "start", "--manifest"]
+
+
+def test_watch_skips_planning_when_noted_pause_marker_exists(monkeypatch, app_settings) -> None:
+    monkeypatch.setattr("briefing.watch._noted_scheduled_recording_paused", lambda: True)
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=False,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+    )
+
+    assert exit_code == 0
+    assert StateStore(app_settings).list_session_plans() == []
+    assert list(app_settings.meeting_intelligence.sessions_root.glob("*/manifest.json")) == []
+
+
+def test_watch_invalidates_unlaunched_plans_when_noted_pause_marker_exists(monkeypatch, app_settings) -> None:
+    monkeypatch.setattr("briefing.watch._noted_scheduled_recording_paused", lambda: True)
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+    result = plan_event(app_settings, event, events=[event], now=now)
+    assert result.manifest_path is not None
+    assert Path(result.manifest_path).exists()
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=False,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+    )
+
+    assert exit_code == 0
+    plans = StateStore(app_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].status == "invalidated"
+    assert plans[0].invalidation_reason == "scheduled_recording_disabled"
+    assert not Path(result.manifest_path).exists()
+
+
+def test_watch_replans_after_noted_pause_marker_is_removed(app_settings) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+    result = plan_event(app_settings, event, events=[event], now=now)
+    plan = StateStore(app_settings).load_session_plan_for_event(event)
+    assert plan is not None
+    plan.status = "invalidated"
+    plan.invalidation_reason = "scheduled_recording_disabled"
+    StateStore(app_settings).save_session_plan(plan)
+    Path(result.manifest_path).unlink()
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+    )
+
+    assert exit_code == 0
+    plans = StateStore(app_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].status == "planned"
+    assert Path(plans[0].manifest_path).exists()
 
 
 def test_watch_does_not_relaunch_after_prior_launch_attempt(

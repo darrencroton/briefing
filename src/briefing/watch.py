@@ -8,12 +8,14 @@ import subprocess
 import time
 from dataclasses import asdict, replace
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Callable
 
 from .calendar import EventKitClient
 from .models import MeetingEvent
 from .planning import (
     invalidate_stale_plans,
+    invalidate_recording_paused_plans,
     plan_allows_replanning_for_event,
     plan_blocks_replanning,
     plan_event,
@@ -61,6 +63,20 @@ def run_watch(
             )
             if invalidated:
                 logger.info("Invalidation sweep archived %d stale plan(s)", len(invalidated))
+            if _noted_scheduled_recording_paused():
+                paused = invalidate_recording_paused_plans(
+                    settings,
+                    now=now,
+                    state_store=state_store,
+                )
+                logger.info(
+                    "Scheduled recording disabled; skipped noted launch planning%s",
+                    f" and archived {len(paused)} unlaunched plan(s)" if paused else "",
+                )
+                if once:
+                    break
+                sleep_fn(settings.meeting_intelligence.watch_poll_seconds)
+                continue
             refreshed = refresh_active_next_meeting_manifests(
                 settings,
                 events,
@@ -97,6 +113,16 @@ def _fetch_watch_events(
     fetch_end: datetime,
 ) -> list[MeetingEvent]:
     return calendar.fetch_events(fetch_start, fetch_end)
+
+
+def _noted_scheduled_recording_paused() -> bool:
+    return (
+        Path.home()
+        / "Library"
+        / "Application Support"
+        / "noted"
+        / "scheduled-recordings.disabled"
+    ).exists()
 
 
 def _plan_and_maybe_launch(

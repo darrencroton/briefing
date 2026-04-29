@@ -334,7 +334,11 @@ def plan_allows_replanning_for_event(plan: SessionPlanState, event: MeetingEvent
     return (
         (
             plan.status == "invalidated"
-            and plan.invalidation_reason in {"event_cancelled", "event_rescheduled_out_of_tolerance"}
+            and plan.invalidation_reason in {
+                "event_cancelled",
+                "event_rescheduled_out_of_tolerance",
+                "scheduled_recording_disabled",
+            }
         )
         or plan.status == "launch_failed"
     )
@@ -456,6 +460,23 @@ def invalidate_stale_plans(
             continue
         if current.start != planned_start:
             _rewrite_plan_for_reschedule(settings, store, plan, current, events, now)
+    return invalidated
+
+
+def invalidate_recording_paused_plans(
+    settings: AppSettings,
+    *,
+    now: datetime | None = None,
+    state_store: StateStore | None = None,
+) -> list[SessionPlanState]:
+    """Archive unlaunched plans when scheduled recording is globally paused."""
+    now = now or datetime.now().astimezone()
+    store = state_store or StateStore(settings)
+    invalidated: list[SessionPlanState] = []
+    for plan in store.list_session_plans():
+        if plan.status != "planned" or plan.launched_at:
+            continue
+        invalidated.append(_invalidate_plan(settings, store, plan, now, "scheduled_recording_disabled"))
     return invalidated
 
 
