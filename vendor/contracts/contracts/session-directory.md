@@ -27,7 +27,8 @@ sessions/
       completion.json
     logs/
       noted.log
-      briefing.log
+      briefing-ingest.stdout.log
+      briefing-ingest.stderr.log
 ```
 
 One session = one directory. Never share state between sessions. Never write outside the session directory except to the Obsidian note path specified in the manifest (`paths.note_path`).
@@ -103,6 +104,6 @@ Reproduced from §11.5. This is the contract for what `terminal_status` an inges
 
 ## Invariants for writers
 
-- `noted` writes everything except `logs/briefing.log` and (for calendar-driven sessions) `manifest.json`.
-- `briefing` writes `manifest.json` for calendar-driven sessions, and appends to `logs/briefing.log` during planning and ingestion.
+- `noted` writes everything in the session directory, including `logs/briefing-ingest.stdout.log` and `logs/briefing-ingest.stderr.log` (captured from the `briefing session-ingest` subprocess it spawns after completion).
+- `briefing` writes `manifest.json` for calendar-driven sessions before `noted start` is invoked.
 - Only `briefing` writes to the Obsidian note at `paths.note_path`; `noted` never touches it.

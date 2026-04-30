@@ -67,8 +67,8 @@ for d in "$SESSIONS"/*/; do
   jq -r '"[\(.session_id)] \(.terminal_status) - \(.stop_reason)"' "$d/outputs/completion.json" 2>/dev/null
 done
 
-# 2. Check briefing.log entries for ingest failures
-grep -r "ERROR\|WARN" "$SESSIONS"/*/logs/briefing.log 2>/dev/null | tail -30
+# 2. Check briefing-ingest logs for ingest failures
+grep -r "ERROR\|WARN\|error\|failed" "$SESSIONS"/*/logs/briefing-ingest.stderr.log 2>/dev/null | tail -30
 
 # 3. For any session with transcript_ok=true but no summary yet, reprocess:
 # uv run briefing session-reprocess --session-dir <path>

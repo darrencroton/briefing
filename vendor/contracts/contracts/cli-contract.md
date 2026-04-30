@@ -23,13 +23,13 @@ noted extend            --session-id <id> --minutes N
 noted switch-next       --session-id <id>
 noted status            --session-id <id>
 noted validate-manifest --manifest <path>
+noted wait              --session-id <id> [--timeout-seconds N]
 noted version
 ```
 
 ### Optional (later)
 
 ```
-noted wait              --session-id <id> [--timeout-seconds N]
 noted list-sessions
 noted tail-log          --session-id <id>
 ```
@@ -213,7 +213,7 @@ Validates schema, required fields, and value ranges without starting a session.
 
 ---
 
-## `noted wait --session-id <id> [--timeout-seconds N]`  *(optional)*
+## `noted wait --session-id <id> [--timeout-seconds N]`
 
 Blocks until a session is fully processed. For tests and deterministic ingest paths. File-watching `completion.json` is the normal path in v1.
 

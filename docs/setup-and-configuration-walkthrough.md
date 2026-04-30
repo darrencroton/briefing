@@ -139,7 +139,7 @@ uv run briefing init-series --event-uid "EVENT-UID-HERE"
 uv run briefing run
 ```
 
-By default this processes meetings starting between 15 and 45 minutes from now.
+By default this processes meetings starting between 10 and 45 minutes from now.
 
 To dry-run the long-lived recorder planner without launching `noted`:
 
