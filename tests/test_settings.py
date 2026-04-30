@@ -224,6 +224,48 @@ note_template = "meeting_note.md"
     assert settings.meeting_intelligence.sessions_root == tmp_path / "sessions"
     assert settings.meeting_intelligence.pre_roll_seconds == 90
     assert settings.meeting_intelligence.one_off_note_dir == settings.paths.meeting_notes_dir
+    assert settings.meeting_intelligence.default_location_type is None
+    assert settings.meeting_intelligence.local_location_type is None
+    assert settings.meeting_intelligence.location_type_by_host == {}
+
+
+def test_load_settings_parses_recording_location_routing(tmp_path: Path) -> None:
+    text = SETTINGS_HEADER.replace(
+        "watch_lookahead_minutes = 180",
+        'watch_lookahead_minutes = 180\n'
+        'default_location_type = "Office"\n'
+        'local_location_type = ""',
+    ).replace(
+        "\n[calendar]",
+        '\n[meeting_intelligence.location_type_by_host]\n'
+        '"Office-Mac" = "office"\n'
+        '"Home-Mac" = "Home Office"\n\n'
+        '[calendar]',
+    )
+    (tmp_path / "user_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "user_config" / "settings.toml").write_text(
+        f"{text}\n\n[llm]\n"
+        "provider = \"codex\"\n"
+        "command = \"\"\n"
+        "model = \"gpt-5.4\"\n"
+        "effort = \"medium\"\n"
+        "timeout_seconds = 600\n"
+        "retry_attempts = 3\n"
+        "temperature = 0.2\n"
+        "max_output_tokens = 4096\n"
+        "prompt_template = \"pre_meeting_summary.md\"\n"
+        "note_template = \"meeting_note.md\"\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.meeting_intelligence.default_location_type == "office"
+    assert settings.meeting_intelligence.local_location_type is None
+    assert settings.meeting_intelligence.location_type_by_host == {
+        "Office-Mac": "office",
+        "Home-Mac": "home_office",
+    }
 
 
 def test_load_settings_rejects_out_of_bounds_pre_roll(tmp_path: Path) -> None:

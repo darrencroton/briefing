@@ -10,6 +10,7 @@ import tempfile
 
 from .calendar import EventKitClient
 from .llm import get_provider
+from .location_routing import current_machine_names, resolve_local_location_type
 from .models import ValidationMessage
 from .settings import AppSettings, load_env_file
 from .sources.notion_source import NotionClient
@@ -43,6 +44,7 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
         )
 
     _check_sessions_root(settings, messages)
+    _check_recording_location_routing(settings, series_configs, messages)
 
     noted_on_path = shutil.which(settings.meeting_intelligence.noted_command)
     if noted_on_path:
@@ -140,6 +142,44 @@ def validate_environment(settings: AppSettings, series_configs) -> list[Validati
         )
 
     return messages
+
+
+def _check_recording_location_routing(
+    settings: AppSettings,
+    series_configs,
+    messages: list[ValidationMessage],
+) -> None:
+    """Validate host/location routing when targeted recording locations are configured."""
+    has_targeted_location = bool(settings.meeting_intelligence.default_location_type) or any(
+        getattr(config.recording, "location_type", None) for config in series_configs
+    )
+    if not has_targeted_location:
+        return
+
+    names = current_machine_names()
+    local_location = resolve_local_location_type(
+        local_location_type=settings.meeting_intelligence.local_location_type,
+        location_type_by_host=settings.meeting_intelligence.location_type_by_host,
+        machine_names=names,
+    )
+    if local_location:
+        messages.append(
+            ValidationMessage(
+                "info",
+                "recording_location_ok",
+                f"Recording location for this machine is {local_location!r} "
+                f"(machine names: {', '.join(names) or 'unknown'}).",
+            )
+        )
+    else:
+        messages.append(
+            ValidationMessage(
+                "error",
+                "recording_location_unresolved",
+                "Recording location routing is configured, but this machine did not match "
+                "local_location_type or any location_type_by_host entry.",
+            )
+        )
 
 
 def _check_sessions_root(settings: AppSettings, messages: list[ValidationMessage]) -> None:

@@ -15,7 +15,7 @@ Use the source-specific guides under [`source-guides/`](source-guides/README.md)
 
 ## What `briefing` does
 
-`briefing` watches Apple Calendar for meetings starting soon, matches only the meeting series you have explicitly configured, gathers context from the configured sources, asks an LLM CLI to draft the pre-meeting summary, and writes the result into a Markdown note.
+`briefing` watches Apple Calendar for meetings starting soon, matches configured meeting series or explicit one-off `noted config` markers, gathers context from configured sources, asks an LLM CLI to draft the pre-meeting summary, and writes the result into a Markdown note.
 
 The runtime flow is:
 
@@ -36,7 +36,7 @@ The Meeting Intelligence recording flow adds:
 
 Important behavior:
 
-- unconfigured meetings are skipped
+- meetings without a matching series or explicit `noted config` marker are skipped
 - matching uses explicit rules, not title-only heuristics
 - only managed blocks are refreshed
 - user-owned note content is preserved across rewrites
@@ -76,6 +76,8 @@ paths.series_dir = "user_config/series"
 ```
 
 For recording handoff, review `[meeting_intelligence]`. The defaults write session manifests under `sessions/`, call `noted`, and launch 90 seconds before the scheduled start. `noted` is configured separately in `~/Library/Application Support/noted/settings.toml`.
+
+If `briefing watch` runs on more than one Mac, configure `location_type` routing before enabling unattended launch. Set the normal target location with `default_location_type`, then set this Mac's location with `local_location_type` or with the host-name mapping shown later in this guide.
 
 ### 3. Grant Calendar access
 
@@ -225,6 +227,7 @@ Configured series are eligible for `briefing watch` recording by default. Add `r
 ```yaml
 recording:
   record: true
+  location_type: office
   mode: online
   participants:
     host_name: Casey
@@ -239,6 +242,7 @@ Calendar notes can override these fields for one occurrence with a case-insensit
 
 ```text
 noted config:
+location_type: home
 mode: hybrid
 participants:
   host_name: Riley
@@ -247,6 +251,8 @@ recording_policy:
 ```
 
 Use `record: false` under the marker to skip recording for one otherwise matched occurrence. Events with a `noted config` marker are also eligible as one-off recordings even without a series file.
+
+Use `location_type` under the marker to move one occurrence to a different Mac. For example, if the series normally records in the office but this instance is from home, set `location_type: home` in the calendar notes.
 
 ## Planning and watch commands
 
@@ -265,6 +271,19 @@ uv run briefing watch
 ```
 
 `briefing watch` persists plan state under `state/session-plans/`, writes manifests under `[meeting_intelligence].sessions_root`, and archives invalidated unlaunched manifests under `archive/manifests/` rather than deleting them.
+
+For shared multi-Mac settings, prefer a host-name map so the same `settings.toml` can resolve differently on each Mac:
+
+```toml
+[meeting_intelligence]
+default_location_type = "office"
+
+[meeting_intelligence.location_type_by_host]
+"Office-Mac" = "office"
+"Home-Mac" = "home"
+```
+
+`briefing` checks macOS `HostName`, `LocalHostName`, `ComputerName`, then Python host-name fallbacks. `uv run briefing validate` reports the resolved local recording location when routing is configured.
 
 ## Global settings reference
 
@@ -288,6 +307,9 @@ uv run briefing watch
 - `reschedule_tolerance_seconds`: in-tolerance calendar movement rewrites a plan; larger movement invalidates it
 - `watch_poll_seconds`: delay between `briefing watch` polling cycles
 - `watch_lookahead_minutes`: calendar lookahead for watch planning
+- `default_location_type`: optional default target location for recorded meetings, such as `office`; leave unset to disable multi-Mac routing by default
+- `local_location_type`: optional direct location label for this Mac, such as `home`; if unset, `briefing` checks `location_type_by_host`
+- `location_type_by_host`: optional table mapping macOS `HostName`, `LocalHostName`, or `ComputerName` values to location labels
 - `default_host_name`, `default_language`, `default_asr_backend`, `default_diarization_enabled`, `default_mode`: manifest defaults
 - `one_off_note_dir`: optional note directory for one-off `noted config` events; defaults to `paths.meeting_notes_dir`
 - `auto_start`, `auto_stop`, `default_extension_minutes`, `max_single_extension_minutes`, `pre_end_prompt_minutes`, `no_interaction_grace_minutes`: default recording policy fields

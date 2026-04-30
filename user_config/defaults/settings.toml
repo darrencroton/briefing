@@ -16,6 +16,11 @@ pre_roll_seconds = 90
 reschedule_tolerance_seconds = 300
 watch_poll_seconds = 30
 watch_lookahead_minutes = 180
+# Optional multi-Mac routing. When default_location_type is set, only a Mac whose
+# local_location_type (or host-name mapping below) matches the meeting location_type
+# will plan and launch the recording.
+# default_location_type = "office"
+# local_location_type = "office"
 default_host_name = "Meeting host"
 default_language = "en-AU"
 default_asr_backend = "whisperkit"
@@ -29,6 +34,12 @@ default_extension_minutes = 10
 max_single_extension_minutes = 15
 pre_end_prompt_minutes = 5
 no_interaction_grace_minutes = 5
+
+# Optional shared-config host mapping. briefing checks macOS HostName,
+# LocalHostName, ComputerName, then Python host-name fallbacks.
+# [meeting_intelligence.location_type_by_host]
+# "Office-Mac" = "office"
+# "Home-Mac" = "home"
 
 [calendar]
 include_all_day = false

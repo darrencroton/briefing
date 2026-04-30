@@ -35,7 +35,8 @@ The release soak checklist lives in `docs/soak-runbook-week1.md`.
 
 ## Product Constraints
 
-- Process only explicitly configured meeting series.
+- Process only explicitly configured meeting series or one-off events with an explicit `noted config` marker.
+- Keep multi-Mac recording-location routing in `briefing`; `noted` must only execute the manifest it receives.
 - Match series with explicit rules, not title-only heuristics.
 - Keep occurrence state stable across event title changes.
 - Refresh only the managed `## Briefing` pre-meeting block (`briefing run`). Write and replace only the managed `## Meeting Summary` post-meeting section (`briefing session-ingest` and `briefing session-reprocess`).

@@ -118,6 +118,7 @@ class RecordingConfig:
     """Meeting Intelligence recording metadata."""
 
     record: bool | None = None
+    location_type: str | None = None
     mode: str | None = None
     audio_strategy: str | None = None
     host_name: str | None = None

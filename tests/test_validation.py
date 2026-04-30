@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from briefing.models import ValidationMessage
 from briefing.validation import (
     _check_noted_version,
+    _check_recording_location_routing,
     _check_sessions_root,
     validate_environment,
 )
@@ -44,6 +45,34 @@ def test_validate_environment_reports_provider_success(monkeypatch, app_settings
         "info",
         "llm_provider",
         "Validated CLI provider 'claude' via 'claude'.",
+    ) in messages
+
+
+def test_recording_location_routing_reports_resolved_machine(monkeypatch, app_settings, series_config) -> None:
+    app_settings.meeting_intelligence.default_location_type = "office"
+    app_settings.meeting_intelligence.location_type_by_host = {"Office-Mac": "office"}
+    monkeypatch.setattr("briefing.validation.current_machine_names", lambda: ("Office-Mac", "Office-Mac.local"))
+    messages: list[ValidationMessage] = []
+
+    _check_recording_location_routing(app_settings, [series_config], messages)
+
+    assert any(message.code == "recording_location_ok" for message in messages)
+
+
+def test_recording_location_routing_errors_when_targeted_but_unresolved(
+    monkeypatch, app_settings, series_config
+) -> None:
+    app_settings.meeting_intelligence.default_location_type = "office"
+    monkeypatch.setattr("briefing.validation.current_machine_names", lambda: ("Unknown-Mac",))
+    messages: list[ValidationMessage] = []
+
+    _check_recording_location_routing(app_settings, [series_config], messages)
+
+    assert ValidationMessage(
+        "error",
+        "recording_location_unresolved",
+        "Recording location routing is configured, but this machine did not match "
+        "local_location_type or any location_type_by_host entry.",
     ) in messages
 
 

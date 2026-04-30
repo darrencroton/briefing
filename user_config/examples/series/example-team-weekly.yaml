@@ -23,6 +23,7 @@ sources:
       required: false
 recording:
   record: true
+  location_type: office
   mode: online
   participants:
     host_name: Barry

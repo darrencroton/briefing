@@ -24,9 +24,11 @@ When `briefing` runs (manually or via `launchd`), it:
 
 For the Meeting Intelligence recording workflow, `briefing session-plan` writes contract-valid `noted` manifests, and `briefing watch` keeps upcoming meeting manifests current and invokes `noted start --manifest` at pre-roll when scheduled recording is enabled in Noted. After capture finishes, `briefing session-ingest` reads `completion.json` first and writes the managed post-meeting summary. If a transcript or summary needs to be rerun, `briefing session-reprocess` uses the existing session directory.
 
+If you run `briefing watch` on more than one Mac, configure Meeting Intelligence `location_type` routing so only the Mac at the meeting's intended location plans and launches the recording. Series and global defaults can target the normal location, and calendar notes can override a single occurrence with `location_type: home` or another local label.
+
 If a note already exists at the expected path, `briefing` will adopt it by injecting the managed `## Briefing`, `## Meeting Notes`, and frontmatter metadata it needs when that can be done safely. It does not rewrite user content outside managed blocks. After a meeting, `briefing session-ingest` appends an LLM-generated `## Meeting Summary` section at the end of the note with a `---` divider above it; re-running ingest replaces only that section.
 
-Only meetings you have explicitly configured are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
+Only meetings you have explicitly configured by series or by an explicit `noted config` marker are processed. If a required source fails, that meeting's briefing is skipped rather than generated with incomplete context.
 
 ## Current Capabilities
 
@@ -167,6 +169,36 @@ The repeatable local smoke harness is:
 
 ```bash
 scripts/meeting-intelligence-smoke.sh
+```
+
+### Multi-Mac recording routing
+
+When `briefing watch` runs on multiple Macs, use `location_type` labels to prevent the wrong machine from starting an empty room recording.
+
+In `user_config/settings.toml`, set the default target location for meetings and either set this machine's local location directly or map macOS machine names to locations:
+
+```toml
+[meeting_intelligence]
+default_location_type = "office"
+local_location_type = "office"
+```
+
+For a shared config used on both Macs, omit `local_location_type` and use host-name mapping:
+
+```toml
+[meeting_intelligence]
+default_location_type = "office"
+
+[meeting_intelligence.location_type_by_host]
+"Office-Mac" = "office"
+"Home-Mac" = "home"
+```
+
+`briefing` checks macOS `HostName`, `LocalHostName`, `ComputerName`, then Python host-name fallbacks. Calendar notes override the series/default target for one occurrence:
+
+```text
+noted config:
+location_type: home
 ```
 
 ## LLM Configuration

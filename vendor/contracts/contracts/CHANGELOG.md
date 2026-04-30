@@ -4,6 +4,12 @@ All notable changes to the `briefing` ↔ `noted` contracts are recorded here. V
 
 Rules for bumps and the change-proposal process live in `versioning-policy.md`.
 
+## Unreleased
+
+### Added
+
+- Optional `meeting.location_type` in `schemas/manifest.v1.json` as a `briefing`-owned routing label for multi-Mac setups. `noted` treats it as manifest metadata, not execution policy.
+
 ## [1.0.1] — 2026-04-24
 
 Step 5 of the Initial Action Plan: shared fixtures for consumer contract tests.

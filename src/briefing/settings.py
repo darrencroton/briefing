@@ -13,6 +13,7 @@ import yaml
 
 from .bootstrap import default_settings_path, local_settings_path
 from .coerce import optional_int as _optional_int, optional_str as _optional_str, parse_optional_bool
+from .location_routing import normalize_location_type
 from .models import (
     EmailSourceConfig,
     FileSourceConfig,
@@ -52,6 +53,9 @@ class MeetingIntelligenceSettings:
     reschedule_tolerance_seconds: int
     watch_poll_seconds: int
     watch_lookahead_minutes: int
+    default_location_type: str | None
+    local_location_type: str | None
+    location_type_by_host: dict[str, str]
     default_host_name: str
     default_language: str
     default_asr_backend: str
@@ -415,6 +419,9 @@ def _parse_meeting_intelligence_settings(
         reschedule_tolerance_seconds=reschedule_tolerance,
         watch_poll_seconds=watch_poll,
         watch_lookahead_minutes=watch_lookahead,
+        default_location_type=normalize_location_type(_optional_str(raw.get("default_location_type"))),
+        local_location_type=normalize_location_type(_optional_str(raw.get("local_location_type"))),
+        location_type_by_host=_parse_location_type_by_host(raw.get("location_type_by_host")),
         default_host_name=str(raw.get("default_host_name", "Meeting host")).strip() or "Meeting host",
         default_language=str(raw.get("default_language", "en-AU")).strip() or "en-AU",
         default_asr_backend=asr_backend,
@@ -464,6 +471,7 @@ def _parse_recording_config(raw: Any) -> RecordingConfig:
 
     return RecordingConfig(
         record=_optional_bool(raw.get("record")),
+        location_type=normalize_location_type(_optional_str(raw.get("location_type"))),
         mode=mode_type,
         audio_strategy=audio_strategy,
         host_name=_optional_str(participants.get("host_name", raw.get("host_name"))),
@@ -489,6 +497,24 @@ def _parse_recording_config(raw: Any) -> RecordingConfig:
             no_interaction_grace_minutes=_optional_int(policy_raw.get("no_interaction_grace_minutes")),
         ),
     )
+
+
+def _parse_location_type_by_host(raw: Any) -> dict[str, str]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise SettingsError("Invalid settings file: [meeting_intelligence].location_type_by_host must be a table.")
+    parsed: dict[str, str] = {}
+    for host, location in raw.items():
+        host_text = str(host).strip()
+        location_type = normalize_location_type(str(location))
+        if not host_text or not location_type:
+            raise SettingsError(
+                "Invalid settings file: [meeting_intelligence].location_type_by_host entries "
+                "must have non-empty host names and location_type values."
+            )
+        parsed[host_text] = location_type
+    return parsed
 
 
 def _optional_bool(value: Any) -> bool | None:

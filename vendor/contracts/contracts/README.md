@@ -75,6 +75,7 @@ Contracts commits that are not tagged are not considered released. Never emit a 
 - `completion.json` is the sole source of truth for session outcome. Consumers must read it first, never infer from file presence or log parsing (guardrail 3).
 - All timestamps are ISO-8601 with explicit timezone offsets (guardrail 5).
 - `noted` is not allowed to compose a manifest from calendar data. Only `briefing` does that. The contracts reflect this by keeping manifest construction a `briefing`-owned concern (guardrails 4, 8, 11).
+- Multi-Mac `meeting.location_type` routing is `briefing` policy. `noted` may carry the field through validation/logging, but it must not interpret it to make calendar or workflow decisions.
 - Raw audio is the primary asset and is preserved whenever capture succeeds (guardrail 10). The session-directory contract codifies this with the file-requirements table.
 
 ## Phase 1 status

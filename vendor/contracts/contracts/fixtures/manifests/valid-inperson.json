@@ -9,7 +9,8 @@
     "start_time": "2026-04-24T09:30:00+10:00",
     "scheduled_end_time": "2026-04-24T10:00:00+10:00",
     "timezone": "Australia/Melbourne",
-    "location": "Conference Room 3B"
+    "location": "Conference Room 3B",
+    "location_type": "office"
   },
   "mode": {
     "type": "in_person",

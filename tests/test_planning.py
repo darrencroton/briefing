@@ -75,6 +75,13 @@ transcription:
     assert config.speaker_count_hint == 2
 
 
+def test_parse_noted_config_accepts_location_type() -> None:
+    config = parse_noted_config("noted config\nlocation_type: Home Office\n")
+
+    assert config is not None
+    assert config.location_type == "home_office"
+
+
 def test_series_matched_event_uses_noted_config_field_overrides(app_settings) -> None:
     _write_series(
         app_settings,
@@ -103,6 +110,53 @@ def test_series_matched_event_uses_noted_config_field_overrides(app_settings) ->
     assert eligibility.recording.mode == "online"
     assert eligibility.recording.host_name == "Casey"
     assert eligibility.recording.language == "en-AU"
+
+
+def test_location_type_routes_series_to_matching_machine(app_settings) -> None:
+    app_settings.meeting_intelligence.local_location_type = "home"
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+            "recording": {"record": True, "location_type": "office"},
+        },
+    )
+    event = _event()
+
+    from briefing.settings import load_series_configs
+
+    eligibility = resolve_event_eligibility(event, load_series_configs(app_settings), app_settings)
+
+    assert eligibility.eligible is False
+    assert eligibility.reason == "recording_location_mismatch"
+    assert eligibility.target_location_type == "office"
+    assert eligibility.local_location_type == "home"
+
+
+def test_calendar_location_type_override_can_move_series_to_this_machine(app_settings) -> None:
+    app_settings.meeting_intelligence.local_location_type = "home"
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+            "recording": {"record": True, "location_type": "office"},
+        },
+    )
+    event = _event(notes="noted config\nlocation_type: home\n")
+
+    from briefing.settings import load_series_configs
+
+    eligibility = resolve_event_eligibility(event, load_series_configs(app_settings), app_settings)
+
+    assert eligibility.eligible is True
+    assert eligibility.recording is not None
+    assert eligibility.recording.location_type == "home"
 
 
 def test_record_false_skips_series_recording(app_settings) -> None:
@@ -146,6 +200,21 @@ def test_assemble_manifest_validates_against_contract(app_settings, series_confi
     assert manifest["session_id"] == "2026-04-13T100000+1000-cas-strategy-meeting"
     assert manifest["paths"]["note_path"].endswith("2026-04-13-1000-cas-strategy-meeting.md")
     assert manifest["transcription"]["speaker_count_hint"] == 2
+
+
+def test_assemble_manifest_includes_resolved_location_type(app_settings, series_config) -> None:
+    app_settings.meeting_intelligence.default_location_type = "office"
+    app_settings.meeting_intelligence.local_location_type = "office"
+    event = _event()
+    eligibility = resolve_event_eligibility(event, [series_config], app_settings)
+
+    manifest = assemble_manifest(
+        settings=app_settings,
+        eligibility=eligibility,
+        created_at=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+    )
+
+    assert manifest["meeting"]["location_type"] == "office"
 
 
 def test_assemble_manifest_rejects_naive_datetimes(app_settings, series_config) -> None:
@@ -261,6 +330,39 @@ def test_invalidation_sweep_archives_cancelled_unlaunched_manifest(app_settings)
     assert [plan.invalidation_reason for plan in invalidated] == ["event_cancelled"]
     assert not Path(result.manifest_path).exists()
     assert list((app_settings.repo_root / "archive" / "manifests").glob("*.json"))
+
+
+def test_invalidation_sweep_archives_plan_when_calendar_location_moves_to_other_machine(app_settings) -> None:
+    app_settings.meeting_intelligence.default_location_type = "office"
+    app_settings.meeting_intelligence.local_location_type = "office"
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+            "recording": {"record": True},
+        },
+    )
+    original = _event()
+    result = plan_event(
+        app_settings,
+        original,
+        events=[original],
+        now=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+    )
+    assert result.manifest_path is not None
+
+    moved_home = _event(notes="noted config\nlocation_type: home\n")
+    invalidated = invalidate_stale_plans(
+        app_settings,
+        [moved_home],
+        now=datetime.fromisoformat("2026-04-13T09:59:00+10:00"),
+    )
+
+    assert [plan.invalidation_reason for plan in invalidated] == ["recording_location_mismatch"]
+    assert not Path(result.manifest_path).exists()
 
 
 def test_invalidation_sweep_ignores_missing_plan_outside_fetch_window(app_settings) -> None:

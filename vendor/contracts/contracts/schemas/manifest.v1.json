@@ -65,7 +65,12 @@
           "type": "string",
           "minLength": 1
         },
-        "location": { "type": "string" }
+        "location": { "type": "string" },
+        "location_type": {
+          "description": "Optional briefing-owned routing label for multi-Mac setups, e.g. office or home. This is distinct from the free-form calendar location string and is not interpreted by noted.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "mode": {

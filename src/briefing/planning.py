@@ -17,6 +17,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from .calendar import EventKitClient
 from .coerce import optional_int as _optional_int, optional_str as _optional_str, parse_optional_bool
+from .location_routing import normalize_location_type, resolve_local_location_type
 from .matching import match_series
 from .models import MeetingEvent, RecordingConfig, RecordingPolicyConfig, SeriesConfig, SessionPlanState
 from .runner import build_output_filename
@@ -39,6 +40,8 @@ class EligibilityResult:
     series: SeriesConfig | None
     recording: RecordingConfig | None
     one_off: bool = False
+    target_location_type: str | None = None
+    local_location_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +144,7 @@ def recording_config_from_mapping(raw: dict[str, Any]) -> RecordingConfig:
 
     return RecordingConfig(
         record=_optional_bool(raw.get("record")),
+        location_type=normalize_location_type(_optional_str(raw.get("location_type"))),
         mode=mode_type,
         audio_strategy=_optional_str(audio_strategy),
         host_name=_optional_str(participants.get("host_name", raw.get("host_name"))),
@@ -173,6 +177,7 @@ def recording_config_from_mapping(raw: dict[str, Any]) -> RecordingConfig:
 def resolve_event_eligibility(
     event: MeetingEvent,
     series_configs: list[SeriesConfig],
+    settings: AppSettings | None = None,
 ) -> EligibilityResult:
     """Resolve whether an event should enter the automated recording path."""
     marker = parse_noted_config(event.notes)
@@ -185,12 +190,37 @@ def resolve_event_eligibility(
         recording = merge_recording_config(series.recording, marker)
         if recording.record is False:
             return EligibilityResult(False, "recording_disabled", event, series, recording)
+        route_skip = _recording_location_skip_reason(settings, recording)
+        if route_skip:
+            reason, target, local = route_skip
+            return EligibilityResult(
+                False,
+                reason,
+                event,
+                series,
+                recording,
+                target_location_type=target,
+                local_location_type=local,
+            )
         return EligibilityResult(True, None, event, series, recording)
 
     if marker is None:
         return EligibilityResult(False, "no_series_or_noted_config", event, None, None)
     if marker.record is False:
         return EligibilityResult(False, "recording_disabled", event, None, marker, one_off=True)
+    route_skip = _recording_location_skip_reason(settings, marker)
+    if route_skip:
+        reason, target, local = route_skip
+        return EligibilityResult(
+            False,
+            reason,
+            event,
+            None,
+            marker,
+            one_off=True,
+            target_location_type=target,
+            local_location_type=local,
+        )
     return EligibilityResult(True, None, event, None, marker, one_off=True)
 
 
@@ -200,6 +230,7 @@ def merge_recording_config(base: RecordingConfig, override: RecordingConfig | No
         return base
     return RecordingConfig(
         record=_choose(override.record, base.record),
+        location_type=_choose(override.location_type, base.location_type),
         mode=_choose(override.mode, base.mode),
         audio_strategy=_choose(override.audio_strategy, base.audio_strategy),
         host_name=_choose(override.host_name, base.host_name),
@@ -234,6 +265,36 @@ def merge_recording_config(base: RecordingConfig, override: RecordingConfig | No
     )
 
 
+def _recording_location_skip_reason(
+    settings: AppSettings | None,
+    recording: RecordingConfig,
+) -> tuple[str, str, str | None] | None:
+    if settings is None:
+        return None
+    target = _target_location_type(settings, recording)
+    if target is None:
+        return None
+    local = _local_location_type(settings)
+    if local is None:
+        return ("recording_location_unknown", target, None)
+    if local != target:
+        return ("recording_location_mismatch", target, local)
+    return None
+
+
+def _target_location_type(settings: AppSettings, recording: RecordingConfig) -> str | None:
+    return normalize_location_type(
+        recording.location_type or settings.meeting_intelligence.default_location_type
+    )
+
+
+def _local_location_type(settings: AppSettings) -> str | None:
+    return resolve_local_location_type(
+        local_location_type=settings.meeting_intelligence.local_location_type,
+        location_type_by_host=settings.meeting_intelligence.location_type_by_host,
+    )
+
+
 def plan_event_by_id(
     settings: AppSettings,
     event_id: str,
@@ -264,7 +325,7 @@ def plan_event(
     """Write a manifest for one eligible event."""
     now = now or datetime.now().astimezone()
     series_configs = load_series_configs(settings)
-    eligibility = resolve_event_eligibility(event, series_configs)
+    eligibility = resolve_event_eligibility(event, series_configs, settings)
     if not eligibility.eligible or eligibility.recording is None:
         return SessionPlanResult(
             ok=True,
@@ -338,6 +399,11 @@ def plan_allows_replanning_for_event(plan: SessionPlanState, event: MeetingEvent
                 "event_cancelled",
                 "event_rescheduled_out_of_tolerance",
                 "scheduled_recording_disabled",
+                "recording_disabled",
+                "recording_location_mismatch",
+                "recording_location_unknown",
+                "event_rescheduled_became_ineligible",
+                "event_became_ineligible",
             }
         )
         or plan.status == "launch_failed"
@@ -400,6 +466,9 @@ def assemble_manifest(
         meeting["series_id"] = eligibility.series.series_id
     if event.location:
         meeting["location"] = event.location
+    target_location_type = _target_location_type(settings, recording)
+    if target_location_type:
+        meeting["location_type"] = target_location_type
 
     return {
         "schema_version": "1.0",
@@ -443,6 +512,7 @@ def invalidate_stale_plans(
     now = now or datetime.now().astimezone()
     store = state_store or StateStore(settings)
     events_by_uid = {event.uid: event for event in events}
+    series_configs = load_series_configs(settings)
     invalidated: list[SessionPlanState] = []
     for plan in store.list_session_plans():
         if plan.status != "planned" or plan.launched_at:
@@ -452,6 +522,18 @@ def invalidate_stale_plans(
             if not _plan_was_within_fetch_window(plan, fetched_start, fetched_end):
                 continue
             invalidated.append(_invalidate_plan(settings, store, plan, now, "event_cancelled"))
+            continue
+        eligibility = resolve_event_eligibility(current, series_configs, settings)
+        if not eligibility.eligible:
+            invalidated.append(
+                _invalidate_plan(
+                    settings,
+                    store,
+                    plan,
+                    now,
+                    eligibility.reason or "event_became_ineligible",
+                )
+            )
             continue
         planned_start = datetime.fromisoformat(plan.start_iso)
         delta = abs((current.start - planned_start).total_seconds())
@@ -494,7 +576,7 @@ def _prewrite_next_manifest(
         if candidate.start <= current_event.start:
             continue
         try:
-            eligibility = resolve_event_eligibility(candidate, series_configs)
+            eligibility = resolve_event_eligibility(candidate, series_configs, settings)
             if not eligibility.eligible or eligibility.recording is None:
                 continue
             existing = state_store.load_session_plan_for_event(candidate)
@@ -855,7 +937,7 @@ def _rewrite_plan_for_reschedule(
 ) -> None:
     logger = logging.getLogger("briefing.watch")
     series_configs = load_series_configs(settings)
-    eligibility = resolve_event_eligibility(event, series_configs)
+    eligibility = resolve_event_eligibility(event, series_configs, settings)
     if not eligibility.eligible or eligibility.recording is None:
         _invalidate_plan(settings, store, plan, now, "event_rescheduled_became_ineligible")
         return

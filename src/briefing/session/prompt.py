@@ -86,6 +86,7 @@ def _build_meeting_context(manifest: Manifest, completion: Completion) -> str:
         f"Scheduled end: {meeting.get('scheduled_end_time') or 'not specified'}",
         f"Timezone: {meeting.get('timezone', 'not specified')}",
         f"Location: {meeting.get('location') or 'not specified'}",
+        f"Location type: {meeting.get('location_type') or 'not specified'}",
         f"Series id: {manifest.series_id or 'ad-hoc'}",
         f"Session id: {manifest.session_id}",
         f"Terminal status: {completion.terminal_status}",
