@@ -87,6 +87,61 @@ tail -n 50 logs/launchd-watch.stdout.log
 tail -n 50 logs/launchd-watch.stderr.log
 ```
 
+## Stop or uninstall a LaunchAgent
+
+Use `bootout` to stop a loaded job. This is the right way to cancel the
+long-running watcher because `com.user.briefing-watch` has `KeepAlive` enabled;
+killing the process directly can let `launchd` restart it.
+
+Uninstall all `briefing` LaunchAgents:
+
+```bash
+./scripts/launchd/uninstall-all.sh
+```
+
+The uninstall scripts stop the loaded job and move the installed plist from
+`~/Library/LaunchAgents` into `archive/launchd/`.
+
+Uninstall only the batch `briefing run` LaunchAgent:
+
+```bash
+./scripts/launchd/uninstall-plist.sh
+```
+
+Uninstall only the long-running `briefing watch` LaunchAgent:
+
+```bash
+./scripts/launchd/uninstall-watch-plist.sh
+```
+
+To stop a job without uninstalling it, run `bootout` directly.
+
+Stop the batch `briefing run` LaunchAgent:
+
+```bash
+launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.user.briefing.plist"
+```
+
+Stop the long-running `briefing watch` LaunchAgent:
+
+```bash
+launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.user.briefing-watch.plist"
+```
+
+If the job is not currently loaded, `launchctl` may print an error such as
+`No such process`. That is fine when your goal is only to ensure the job is not
+running.
+
+Check what `launchd` still has loaded:
+
+```bash
+launchctl print "gui/$(id -u)/com.user.briefing"
+launchctl print "gui/$(id -u)/com.user.briefing-watch"
+```
+
+If a job has been stopped or uninstalled, `launchctl print` should report that
+the service could not be found.
+
 ## Update the job
 
 If you move this repo or your `uv` path changes, rerun `render-plist.sh` and reinstall.
