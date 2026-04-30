@@ -66,6 +66,10 @@
       "minimum": 0
     },
     "pre_end_prompt_shown": { "type": "boolean" },
+    "is_paused": {
+      "description": "True while an active recording session has temporarily suspended audio capture. The top-level status remains recording.",
+      "type": "boolean"
+    },
     "last_error": {
       "description": "Short human-readable description of the most recent error, if any.",
       "type": ["string", "null"]

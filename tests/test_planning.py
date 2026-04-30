@@ -159,6 +159,32 @@ def test_calendar_location_type_override_can_move_series_to_this_machine(app_set
     assert eligibility.recording.location_type == "home"
 
 
+def test_location_type_skips_event_when_local_routing_unresolved(app_settings) -> None:
+    # Target location is set in the series YAML, but no local routing is configured —
+    # neither local_location_type nor any location_type_by_host entry. The planner must
+    # return recording_location_unknown so the user can discover the misconfiguration.
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+            "recording": {"record": True, "location_type": "office"},
+        },
+    )
+    event = _event()
+
+    from briefing.settings import load_series_configs
+
+    eligibility = resolve_event_eligibility(event, load_series_configs(app_settings), app_settings)
+
+    assert eligibility.eligible is False
+    assert eligibility.reason == "recording_location_unknown"
+    assert eligibility.target_location_type == "office"
+    assert eligibility.local_location_type is None
+
+
 def test_record_false_skips_series_recording(app_settings) -> None:
     _write_series(
         app_settings,

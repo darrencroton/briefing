@@ -4,10 +4,12 @@ All notable changes to the `briefing` ↔ `noted` contracts are recorded here. V
 
 Rules for bumps and the change-proposal process live in `versioning-policy.md`.
 
-## Unreleased
+## [1.0.2] — 2026-04-30
 
 ### Added
 
+- `noted pause --session-id <id>` and `noted continue --session-id <id>` as optional runtime controls. A paused session remains `status: "recording"` and reports the optional `is_paused` status property instead of adding a locked vocabulary value.
+- Optional `is_paused` property in `schemas/runtime-status.v1.json`.
 - Optional `meeting.location_type` in `schemas/manifest.v1.json` as a `briefing`-owned routing label for multi-Mac setups. `noted` treats it as manifest metadata, not execution policy.
 
 ## [1.0.1] — 2026-04-24
@@ -88,3 +90,4 @@ Open items whose resolution is not yet reflected here because they do not affect
 
 [1.0.0]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.0
 [1.0.1]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.1
+[1.0.2]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.2

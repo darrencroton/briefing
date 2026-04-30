@@ -35,6 +35,8 @@ Top-level session state (§10.1):
 - `completed_with_warnings`
 - `failed`
 
+Pause state is not a runtime status. During a pause the session remains `recording` and `runtime/status.json` carries `is_paused: true`.
+
 ## Runtime phases (in `runtime/status.json`)
 
 Finer-grained indicator within `recording`, `stopping`, or `processing` (§10.2):

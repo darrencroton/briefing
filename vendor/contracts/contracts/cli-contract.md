@@ -16,6 +16,8 @@
 
 ```
 noted start             --manifest <path>
+noted pause             --session-id <id>
+noted continue          --session-id <id>
 noted stop              --session-id <id>
 noted extend            --session-id <id> --minutes N
 noted switch-next       --session-id <id>
@@ -30,7 +32,6 @@ noted version
 noted wait              --session-id <id> [--timeout-seconds N]
 noted list-sessions
 noted tail-log          --session-id <id>
-noted resume            --session-id <id>
 ```
 
 ---
@@ -84,6 +85,25 @@ Post-processing proceeds through the phases in §10.2 (`flushing_audio` → `run
 
 ```json
 {"ok": true, "session_id": "2026-04-18-jayde-1600", "status": "processing", "audio_finalised": true}
+```
+
+---
+
+## `noted pause --session-id <id>` / `noted continue --session-id <id>`
+
+Temporarily suspends or resumes audio capture for an active session. The session stays active and remains `status: "recording"`; `status.json` and `noted status` expose `is_paused` instead of adding a new locked runtime status value.
+
+| Code | Meaning |
+|------|---------|
+| 0    | Pause/continue state applied |
+| 2    | Unknown session ID |
+| 3    | Session not in `recording` |
+| 4    | Pause/continue request failed or timed out |
+
+**stdout (success):**
+
+```json
+{"ok": true, "session_id": "2026-04-18-jayde-1600", "status": "recording", "is_paused": true}
 ```
 
 ---
@@ -142,6 +162,7 @@ Stops the current capture immediately (same fast-stop as `stop`), writes `stop_r
   "session_id": "2026-04-18-jayde-1600",
   "status": "recording",
   "phase": "capturing",
+  "is_paused": false,
   "started_at": "2026-04-18T16:00:03+10:00",
   "scheduled_end_time": "2026-04-18T17:00:00+10:00",
   "current_extension_minutes": 0,
@@ -151,7 +172,7 @@ Stops the current capture immediately (same fast-stop as `stop`), writes `stop_r
 }
 ```
 
-`status` and `phase` are drawn from the locked vocabularies in §10.1 and §10.2 respectively. See also `schemas/runtime-status.v1.json`.
+`status` and `phase` are drawn from the locked vocabularies in §10.1 and §10.2 respectively. `is_paused` is an optional additional property on the runtime status shape. See also `schemas/runtime-status.v1.json`.
 
 ---
 

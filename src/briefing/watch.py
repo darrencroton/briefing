@@ -157,6 +157,13 @@ def _plan_and_maybe_launch(
 
     result = plan_event(settings, event, events=events, now=now, state_store=state_store)
     logger.info("Session plan result: %s", result.to_json_line())
+    if result.skip_reason == "recording_location_unknown":
+        logger.warning(
+            "Recording skipped: location routing is configured but this machine is not mapped. "
+            "Run `briefing validate` to diagnose. event_uid=%s title=%r",
+            event.uid,
+            event.title,
+        )
     if result.status != "planned" or not result.session_id or not result.manifest_path:
         return
 

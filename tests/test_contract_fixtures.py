@@ -15,7 +15,7 @@ def test_contracts_snapshot_is_pinned_to_expected_tag() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     tag = (repo_root / "vendor" / "contracts" / "CONTRACTS_TAG").read_text().strip()
 
-    assert tag == "v1.0.1"
+    assert tag == "v1.0.2"
 
 
 def test_shared_contract_fixtures_validate_against_schemas() -> None:

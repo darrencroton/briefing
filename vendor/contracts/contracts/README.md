@@ -31,9 +31,9 @@ Each consumer repo carries the whole `briefing-noted-contracts` root as a submod
 ```bash
 # in briefing/ or noted/
 git submodule add https://github.com/darrencroton/briefing-noted-contracts.git vendor/contracts
-git -C vendor/contracts checkout v1.0.0
+git -C vendor/contracts checkout v1.0.1
 git add .gitmodules vendor/contracts
-git commit -m "Pin contracts to v1.0.0"
+git commit -m "Pin contracts to v1.0.1"
 ```
 
 Consumers then read schemas from `vendor/contracts/contracts/schemas/...`.
@@ -90,6 +90,6 @@ The broader project is three repositories living side-by-side:
 |------|------|
 | `briefing-noted-contracts` | This repo. Neutral contracts, pinned by tag. |
 | `briefing` | Orchestration brain. Python 3.13+. |
-| `noted` | Menubar capture agent. Swift 6.3, macOS 26+. |
+| `noted` | Menubar capture agent. Swift 6.2, macOS 26+. |
 
 See `AGENTS.md` at the root for the architectural boundaries each consumer must respect.
