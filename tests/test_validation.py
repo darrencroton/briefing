@@ -71,8 +71,24 @@ def test_recording_location_routing_errors_when_targeted_but_unresolved(
     assert ValidationMessage(
         "error",
         "recording_location_unresolved",
-        "Recording location routing is configured, but this machine did not match "
+        "Meeting location routing is configured, but this machine did not match "
         "local_location_type or any location_type_by_host entry.",
+    ) in messages
+
+
+def test_location_routing_warns_when_host_map_has_untargeted_series(app_settings, series_config) -> None:
+    app_settings.meeting_intelligence.default_location_type = None
+    app_settings.meeting_intelligence.location_type_by_host = {"Office-Mac": "office", "Home-Mac": "home"}
+    series_config.recording.location_type = None
+    messages: list[ValidationMessage] = []
+
+    _check_recording_location_routing(app_settings, [series_config], messages)
+
+    assert ValidationMessage(
+        "warning",
+        "meeting_location_routing_incomplete",
+        "Host location routing is configured, but these series have no location_type "
+        "and no default_location_type is set: cas-strategy.",
     ) in messages
 
 

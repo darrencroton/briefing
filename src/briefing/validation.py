@@ -149,10 +149,27 @@ def _check_recording_location_routing(
     series_configs,
     messages: list[ValidationMessage],
 ) -> None:
-    """Validate host/location routing when targeted recording locations are configured."""
-    has_targeted_location = bool(settings.meeting_intelligence.default_location_type) or any(
-        getattr(config.recording, "location_type", None) for config in series_configs
-    )
+    """Validate host/location routing when targeted meeting locations are configured."""
+    has_default_location = bool(settings.meeting_intelligence.default_location_type)
+    untargeted_series = [
+        config.series_id
+        for config in series_configs
+        if not getattr(config.recording, "location_type", None)
+    ]
+    has_targeted_location = has_default_location or len(untargeted_series) < len(series_configs)
+    if (
+        settings.meeting_intelligence.location_type_by_host
+        and not has_default_location
+        and untargeted_series
+    ):
+        messages.append(
+            ValidationMessage(
+                "warning",
+                "meeting_location_routing_incomplete",
+                "Host location routing is configured, but these series have no location_type "
+                f"and no default_location_type is set: {', '.join(untargeted_series)}.",
+            )
+        )
     if not has_targeted_location:
         return
 
@@ -167,7 +184,7 @@ def _check_recording_location_routing(
             ValidationMessage(
                 "info",
                 "recording_location_ok",
-                f"Recording location for this machine is {local_location!r} "
+                f"Meeting location for this machine is {local_location!r} "
                 f"(machine names: {', '.join(names) or 'unknown'}).",
             )
         )
@@ -176,7 +193,7 @@ def _check_recording_location_routing(
             ValidationMessage(
                 "error",
                 "recording_location_unresolved",
-                "Recording location routing is configured, but this machine did not match "
+                "Meeting location routing is configured, but this machine did not match "
                 "local_location_type or any location_type_by_host entry.",
             )
         )

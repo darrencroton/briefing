@@ -282,7 +282,7 @@ uv run briefing watch
 
 `briefing watch` persists plan state under `state/session-plans/`, writes manifests under `[meeting_intelligence].sessions_root`, and archives invalidated unlaunched manifests under `archive/manifests/` rather than deleting them.
 
-For shared multi-Mac settings, prefer a host-name map so the same `settings.toml` can resolve differently on each Mac:
+For shared multi-Mac settings, prefer a host-name map so the same `settings.toml` can resolve differently on each Mac. The resolved location gates both pre-meeting briefing generation and scheduled recording:
 
 ```toml
 [meeting_intelligence]
@@ -293,7 +293,7 @@ default_location_type = "office"
 "Home-Mac" = "home"
 ```
 
-`briefing` checks macOS `HostName`, `LocalHostName`, `ComputerName`, then Python host-name fallbacks. `uv run briefing validate` reports the resolved local recording location when routing is configured.
+`briefing` checks macOS `HostName`, `LocalHostName`, `ComputerName`, then Python host-name fallbacks. `uv run briefing validate` reports the resolved local meeting location when routing is configured, and warns if host routing is configured but any series has no target `location_type` and no `default_location_type` fallback.
 
 ## Global settings reference
 

@@ -245,6 +245,120 @@ def test_process_event_locks_once_meeting_has_started(
     assert occurrence.lock_reason == "meeting_started"
 
 
+def test_process_event_skips_briefing_when_location_mismatches(
+    monkeypatch, app_settings, series_config
+) -> None:
+    app_settings.meeting_intelligence.local_location_type = "home"
+    series_config.recording.location_type = "office"
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    state_store = StateStore(app_settings)
+
+    def _fail_collect(*args, **kwargs):
+        raise AssertionError("location routing should skip before source collection")
+
+    monkeypatch.setattr("briefing.runner.collect_sources", _fail_collect)
+
+    result = process_event(
+        settings=app_settings,
+        event=event,
+        series_configs=[series_config],
+        env={},
+        state_store=state_store,
+        provider=FakeProvider(),
+        now=datetime.fromisoformat("2026-04-13T09:30:00+10:00"),
+        dry_run=False,
+    )
+
+    assert result["status"] == "skipped"
+    assert result["reason"] == "briefing_location_mismatch"
+    assert result["target_location_type"] == "office"
+    assert result["local_location_type"] == "home"
+
+
+def test_process_event_skips_briefing_when_location_unresolved(
+    monkeypatch, app_settings, series_config
+) -> None:
+    app_settings.meeting_intelligence.location_type_by_host = {"Known-Mac": "home"}
+    series_config.recording.location_type = "home"
+    monkeypatch.setattr("briefing.location_routing.current_machine_names", lambda: ("Unknown-Mac",))
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    state_store = StateStore(app_settings)
+
+    def _fail_collect(*args, **kwargs):
+        raise AssertionError("location routing should skip before source collection")
+
+    monkeypatch.setattr("briefing.runner.collect_sources", _fail_collect)
+
+    result = process_event(
+        settings=app_settings,
+        event=event,
+        series_configs=[series_config],
+        env={},
+        state_store=state_store,
+        provider=FakeProvider(),
+        now=datetime.fromisoformat("2026-04-13T09:30:00+10:00"),
+        dry_run=False,
+    )
+
+    assert result["status"] == "skipped"
+    assert result["reason"] == "briefing_location_unknown"
+    assert result["target_location_type"] == "home"
+    assert result["local_location_type"] is None
+
+
+def test_process_event_calendar_location_override_routes_briefing_here(
+    monkeypatch, app_settings, series_config
+) -> None:
+    app_settings.meeting_intelligence.local_location_type = "home"
+    series_config.recording.location_type = "office"
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+        notes="noted config:\nlocation_type: home\n",
+    )
+    state_store = StateStore(app_settings)
+    monkeypatch.setattr(
+        "briefing.runner.collect_sources",
+        lambda settings, event, series, logger, env: [
+            SourceResult(
+                source_type="previous_note",
+                label="Previous meeting note",
+                content="No previous note found.",
+                required=False,
+                status="ok",
+            )
+        ],
+    )
+
+    result = process_event(
+        settings=app_settings,
+        event=event,
+        series_configs=[series_config],
+        env={},
+        state_store=state_store,
+        provider=FakeProvider(),
+        now=datetime.fromisoformat("2026-04-13T09:30:00+10:00"),
+        dry_run=False,
+    )
+
+    assert result["status"] == "written"
+
+
 def test_process_event_preserves_duplicate_source_labels_in_state(
     monkeypatch, app_settings, series_config
 ) -> None:

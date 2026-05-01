@@ -5,7 +5,17 @@ from __future__ import annotations
 import platform
 import socket
 import subprocess
+from dataclasses import dataclass
 from functools import lru_cache
+
+
+@dataclass(frozen=True, slots=True)
+class LocationRoute:
+    """Resolved local-vs-target routing decision for a meeting."""
+
+    skip_reason: str | None
+    target_location_type: str | None
+    local_location_type: str | None
 
 
 def normalize_location_type(value: str | None) -> str | None:
@@ -65,6 +75,30 @@ def resolve_local_location_type(
         if location:
             return location
     return None
+
+
+def resolve_location_route(
+    *,
+    target_location_type: str | None,
+    default_location_type: str | None,
+    local_location_type: str | None,
+    location_type_by_host: dict[str, str],
+    reason_prefix: str,
+) -> LocationRoute:
+    """Resolve whether this Mac should handle a targeted meeting location."""
+    target = normalize_location_type(target_location_type or default_location_type)
+    if target is None:
+        return LocationRoute(None, None, None)
+
+    local = resolve_local_location_type(
+        local_location_type=local_location_type,
+        location_type_by_host=location_type_by_host,
+    )
+    if local is None:
+        return LocationRoute(f"{reason_prefix}_location_unknown", target, None)
+    if local != target:
+        return LocationRoute(f"{reason_prefix}_location_mismatch", target, local)
+    return LocationRoute(None, target, local)
 
 
 def _scutil_get(name_key: str) -> str | None:

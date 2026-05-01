@@ -9,10 +9,12 @@ from pathlib import Path
 
 from .calendar import EventKitClient
 from .llm import LLMError, get_provider
+from .location_routing import resolve_location_route
 from .matching import match_series
 from .models import MeetingEvent, OccurrenceState, SeriesConfig
 from .notes import NoteStructureError, refresh_note, render_note
 from .prompts import render_summary_prompt
+from .recording_config import RecordingConfigError, parse_noted_config
 from .settings import AppSettings, load_env_file, load_series_configs
 from .sources import collect_sources
 from .state import StateStore
@@ -113,6 +115,44 @@ def process_event(
         }
 
     series = matches[0]
+    try:
+        marker = parse_noted_config(event.notes)
+    except RecordingConfigError as exc:
+        logger.error("Invalid noted config for %s: %s", event.title, exc)
+        return {
+            "event_uid": event.uid,
+            "series_id": series.series_id,
+            "status": "error",
+            "reason": "noted_config_invalid",
+            "error": str(exc),
+        }
+    target_location_type = (
+        marker.location_type if marker and marker.location_type else series.recording.location_type
+    )
+    route = resolve_location_route(
+        target_location_type=target_location_type,
+        default_location_type=settings.meeting_intelligence.default_location_type,
+        local_location_type=settings.meeting_intelligence.local_location_type,
+        location_type_by_host=settings.meeting_intelligence.location_type_by_host,
+        reason_prefix="briefing",
+    )
+    if route.skip_reason:
+        logger.info(
+            "Skipping %s: %s target=%s local=%s",
+            event.title,
+            route.skip_reason,
+            route.target_location_type,
+            route.local_location_type,
+        )
+        return {
+            "event_uid": event.uid,
+            "series_id": series.series_id,
+            "status": "skipped",
+            "reason": route.skip_reason,
+            "target_location_type": route.target_location_type,
+            "local_location_type": route.local_location_type,
+        }
+
     occurrence_key = state_store.occurrence_key(event)
     state = state_store.load_occurrence(occurrence_key) or OccurrenceState(
         occurrence_key=occurrence_key,

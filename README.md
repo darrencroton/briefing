@@ -141,9 +141,9 @@ After the manual flow is working, install the `launchd` agents:
 
 → [`scripts/launchd/README.md`](scripts/launchd/README.md)
 
-### Multi-Mac recording routing
+### Multi-Mac meeting routing
 
-When `briefing watch` runs on more than one Mac, use `location_type` labels so only the Mac at the meeting's intended location starts the recording.
+When `briefing run` or `briefing watch` runs on more than one Mac, use `location_type` labels so only the Mac at the meeting's intended location creates the pre-meeting briefing and starts the recording.
 
 In `user_config/settings.toml`:
 

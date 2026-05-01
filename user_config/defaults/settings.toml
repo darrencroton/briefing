@@ -22,6 +22,7 @@ watch_lookahead_minutes = 180
 reschedule_tolerance_seconds = 300
 
 # Use location_type routing only when multiple Macs may see the same calendar.
+# It gates both pre-meeting briefing generation and scheduled recording.
 # default_location_type is the fallback target location when notes and series omit it.
 # local_location_type overrides host-name detection for this Mac when set.
 # default_location_type = "office"
