@@ -57,6 +57,9 @@ uv run briefing validate
 
 # 3. Check for any sessions from yesterday that need reprocessing
 ls -lt "$SESSIONS/" | head -20
+
+# 4. Preview raw audio that has aged past the retention window
+uv run briefing retention-sweep --dry-run
 ```
 
 And each evening:
@@ -86,6 +89,7 @@ grep -r "ERROR\|WARN\|error\|failed" "$SESSIONS"/*/logs/briefing-ingest.stderr.l
 | Summary block missing from note | LLM call timed out or failed | Run `briefing session-reprocess --session-dir <path>` |
 | Summary written but poor quality | Diarization noise / short meeting | Rate 1–2, flag for prompt tuning after soak |
 | `noted version` schema mismatch in validate | `noted` and `briefing` vendor contracts are out of sync | Run `briefing validate` and check `noted_schema_compat_error` |
+| Raw audio missing for an old session | Retention window expired and moved raw audio to Trash | Restore from macOS Trash if it is still needed for recovery |
 
 ---
 
@@ -109,6 +113,10 @@ noted wait --session-id <id> --timeout-seconds 600
 
 # Validate the environment before any meeting day
 uv run briefing validate
+
+# Preview or enforce raw-audio retention
+uv run briefing retention-sweep --dry-run
+uv run briefing retention-sweep
 ```
 
 ---

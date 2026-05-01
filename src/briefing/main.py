@@ -13,6 +13,7 @@ import yaml
 from .calendar import EventKitClient
 from .logging_utils import configure_logging
 from .planning import plan_event_by_id
+from .retention import emit_retention_result, run_retention_sweep
 from .session.ingest import IngestResult, emit_stdout_result, run_session_ingest
 from .session.reprocess import run_session_reprocess
 from .settings import SettingsError, load_series_configs, load_settings
@@ -82,6 +83,16 @@ def cli() -> int:
     watch_parser.add_argument("--once", action="store_true", help="Run one watch cycle and exit")
     watch_parser.add_argument("--dry-run", action="store_true", help="Plan but do not launch noted")
 
+    retention_parser = subparsers.add_parser(
+        "retention-sweep",
+        help="Move expired raw audio from completed sessions to macOS Trash",
+    )
+    retention_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report expired raw audio without moving files to Trash",
+    )
+
     args = parser.parse_args()
     try:
         settings = load_settings()
@@ -106,6 +117,10 @@ def cli() -> int:
         return _session_plan(settings, args.event_id, now)
     if args.command == "watch":
         return run_watch(settings, once=args.once, dry_run=args.dry_run)
+    if args.command == "retention-sweep":
+        result = run_retention_sweep(settings, dry_run=args.dry_run)
+        emit_retention_result(result)
+        return result.exit_code
     return 1
 
 

@@ -29,6 +29,7 @@ from pathlib import Path
 
 from ..llm import get_provider
 from ..notes import NoteStructureError
+from ..retention import run_retention_sweep_best_effort
 from ..settings import AppSettings
 from .completion import (
     Completion,
@@ -109,7 +110,10 @@ def run_session_ingest(
         LOGGER.warning("Could not attach session log handler (%s): %s", session_log_path, exc)
 
     try:
-        return _run(settings, session_dir, provider=provider, dry_run=dry_run)
+        result = _run(settings, session_dir, provider=provider, dry_run=dry_run)
+        if result.exit_code == 0 and not dry_run:
+            run_retention_sweep_best_effort(settings)
+        return result
     finally:
         if session_handler is not None:
             logging.getLogger().removeHandler(session_handler)

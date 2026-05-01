@@ -111,6 +111,12 @@ If `noted` is installed and on `PATH`, dry-run one watch cycle to confirm manife
 uv run briefing watch --once --dry-run
 ```
 
+When that looks right, start the watcher:
+
+```bash
+uv run briefing watch
+```
+
 To inspect the manifest plan for a single event:
 
 ```bash
@@ -123,7 +129,12 @@ uv run briefing session-plan --event-id "EVENT-UID-HERE"
 uv run briefing session-ingest --session-dir /path/to/session
 uv run briefing session-ingest --session-dir /path/to/session --dry-run
 uv run briefing session-reprocess --session-dir /path/to/session  # rerun from existing transcript
+uv run briefing retention-sweep --dry-run                         # inspect raw audio due for Trash
 ```
+
+Raw audio for completed sessions is retained for `raw_audio_retention_days` days
+(default 7) from `completion.json.completed_at`, then moved to macOS Trash.
+Transcripts, summaries, logs, manifests, and `completion.json` remain in place.
 
 For ad hoc recordings started from the `noted` menubar, `noted` must also be able to find a `briefing` command. From this repo:
 
@@ -183,6 +194,8 @@ location_type: home
 | `uv run briefing session-plan --event-id <id>` | Write a manifest for one event |
 | `uv run briefing session-ingest --session-dir <path>` | Ingest a completed recording session |
 | `uv run briefing session-reprocess --session-dir <path>` | Rerun summary from an existing transcript |
+| `uv run briefing retention-sweep --dry-run` | Preview completed-session raw audio due for Trash |
+| `uv run briefing retention-sweep` | Move expired completed-session raw audio to macOS Trash |
 
 ## Sources
 

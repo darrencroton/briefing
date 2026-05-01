@@ -64,6 +64,26 @@ def test_watch_once_dry_run_plans_without_marking_launch(app_settings) -> None:
     assert plans[0].launch_exit_code is None
 
 
+def test_watch_cycle_runs_retention_best_effort(monkeypatch, app_settings) -> None:
+    calls: list[tuple[object, bool]] = []
+    monkeypatch.setattr(
+        "briefing.watch.run_retention_sweep_best_effort",
+        lambda settings, *, dry_run=False: calls.append((settings, dry_run)),
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([]),
+    )
+
+    assert exit_code == 0
+    assert calls == [(app_settings, True)]
+
+
 def test_watch_dry_run_does_not_block_later_real_launch(monkeypatch, app_settings) -> None:
     (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
         yaml.safe_dump(

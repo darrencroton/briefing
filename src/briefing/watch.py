@@ -21,6 +21,7 @@ from .planning import (
     plan_event,
     refresh_active_next_meeting_manifests,
 )
+from .retention import run_retention_sweep_best_effort
 from .settings import AppSettings
 from .state import StateStore
 
@@ -50,6 +51,7 @@ def run_watch(
         exit_code = 0
         now = now_provider()
         try:
+            run_retention_sweep_best_effort(settings, dry_run=dry_run)
             fetch_start = now - timedelta(days=1)
             fetch_end = now + timedelta(minutes=settings.meeting_intelligence.watch_lookahead_minutes)
             events = _fetch_watch_events(calendar, fetch_start, fetch_end)

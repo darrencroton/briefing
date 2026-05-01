@@ -314,6 +314,7 @@ default_location_type = "office"
 - `sessions_root`: local root for planned noted session directories and manifests
 - `noted_command`: executable used for `noted start --manifest`
 - `pre_roll_seconds`: launch lead time; must be between 60 and 180 seconds
+- `raw_audio_retention_days`: completed-session raw audio retention window; default 7 days from `completion.json.completed_at`, after which raw audio is moved to macOS Trash
 - `reschedule_tolerance_seconds`: in-tolerance calendar movement rewrites a plan; larger movement invalidates it
 - `watch_poll_seconds`: delay between `briefing watch` polling cycles
 - `watch_lookahead_minutes`: calendar lookahead for watch planning
@@ -323,6 +324,14 @@ default_location_type = "office"
 - `default_host_name`, `default_language`, `default_asr_backend`, `default_diarization_enabled`, `default_mode`: manifest defaults
 - `one_off_note_dir`: optional note directory for one-off `noted config` events; defaults to `paths.meeting_notes_dir`
 - `auto_start`, `auto_stop`, `default_extension_minutes`, `max_single_extension_minutes`, `pre_end_prompt_minutes`, `no_interaction_grace_minutes`: default recording policy fields
+
+Inspect raw audio due for retention cleanup before allowing a sweep to move files:
+
+```bash
+uv run briefing retention-sweep --dry-run
+```
+
+`briefing watch` and successful `session-ingest` runs also perform best-effort retention sweeps. Only raw audio files in completed sessions are moved; transcripts, summaries, logs, manifests, and `completion.json` stay in the session directory. Running `briefing watch --dry-run` also puts retention in dry-run mode, so files are reported but not moved.
 
 ### `[calendar]`
 

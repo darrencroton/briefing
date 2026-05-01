@@ -50,6 +50,7 @@ class MeetingIntelligenceSettings:
     sessions_root: Path
     noted_command: str
     pre_roll_seconds: int
+    raw_audio_retention_days: int
     reschedule_tolerance_seconds: int
     watch_poll_seconds: int
     watch_lookahead_minutes: int
@@ -348,6 +349,17 @@ def _parse_meeting_intelligence_settings(
             "Invalid settings file: [meeting_intelligence].pre_roll_seconds must be between 60 and 180."
         )
 
+    raw_retention_value = raw.get("raw_audio_retention_days", 7)
+    if isinstance(raw_retention_value, bool) or not isinstance(raw_retention_value, int):
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].raw_audio_retention_days must be an integer."
+        )
+    raw_audio_retention_days = raw_retention_value
+    if raw_audio_retention_days < 1:
+        raise SettingsError(
+            "Invalid settings file: [meeting_intelligence].raw_audio_retention_days must be at least 1."
+        )
+
     default_mode = str(raw.get("default_mode", "in_person")).strip()
     if default_mode not in _VALID_MODE_TYPES:
         raise SettingsError(
@@ -416,6 +428,7 @@ def _parse_meeting_intelligence_settings(
         sessions_root=expand_path(str(raw.get("sessions_root", "sessions")), repo_root),
         noted_command=noted_command,
         pre_roll_seconds=pre_roll,
+        raw_audio_retention_days=raw_audio_retention_days,
         reschedule_tolerance_seconds=reschedule_tolerance,
         watch_poll_seconds=watch_poll,
         watch_lookahead_minutes=watch_lookahead,

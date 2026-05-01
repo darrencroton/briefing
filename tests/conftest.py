@@ -69,6 +69,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
             sessions_root=tmp_path / "sessions",
             noted_command="noted",
             pre_roll_seconds=90,
+            raw_audio_retention_days=7,
             reschedule_tolerance_seconds=300,
             watch_poll_seconds=30,
             watch_lookahead_minutes=180,

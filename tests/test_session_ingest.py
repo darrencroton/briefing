@@ -395,6 +395,44 @@ def test_ingest_completed_writes_summary_block(app_settings, tmp_path: Path) -> 
     assert (fx.session_dir / "logs" / "briefing.log").exists()
 
 
+def test_ingest_success_runs_retention_best_effort(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    tmp_path: Path,
+) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+    calls = []
+    monkeypatch.setattr(
+        "briefing.session.ingest.run_retention_sweep_best_effort",
+        lambda settings: calls.append(settings),
+    )
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=StubProvider())
+
+    assert result.ok
+    assert calls == [app_settings]
+
+
+def test_ingest_recoverable_noop_runs_retention_best_effort(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    tmp_path: Path,
+) -> None:
+    fx = _write_session(tmp_path, "failed-capture.json", transcript=None)
+    calls = []
+    monkeypatch.setattr(
+        "briefing.session.ingest.run_retention_sweep_best_effort",
+        lambda settings: calls.append(settings),
+    )
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=StubProvider())
+
+    assert result.ok
+    assert result.exit_code == 0
+    assert result.decision == IngestDecision.TRANSCRIPT_MISSING.value
+    assert calls == [app_settings]
+
+
 def test_ingest_prompt_receives_meeting_note_context(app_settings, tmp_path: Path) -> None:
     note_seed = (
         "---\ntitle: Weekly Product Review\n---\n"
@@ -470,6 +508,24 @@ def test_ingest_dry_run_generates_summary_without_writing_note(app_settings, tmp
     assert result.note_created is False
     assert provider.prompts and "Transcript:" in provider.prompts[0]
     assert not fx.note_path.exists()
+
+
+def test_ingest_dry_run_does_not_run_retention(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    tmp_path: Path,
+) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+    calls = []
+    monkeypatch.setattr(
+        "briefing.session.ingest.run_retention_sweep_best_effort",
+        lambda settings: calls.append(settings),
+    )
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=StubProvider(), dry_run=True)
+
+    assert result.ok
+    assert calls == []
 
 
 def test_ingest_prompt_receives_diarized_speaker_labels(app_settings, tmp_path: Path) -> None:

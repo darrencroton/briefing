@@ -17,6 +17,8 @@ noted_command = "noted"
 
 # Start recording before the calendar start time; valid range is 60-180 seconds.
 pre_roll_seconds = 90
+# Move raw audio for completed sessions to macOS Trash after this many days.
+raw_audio_retention_days = 7
 watch_poll_seconds = 30
 watch_lookahead_minutes = 180
 reschedule_tolerance_seconds = 300
