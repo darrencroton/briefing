@@ -226,6 +226,49 @@ def test_eventkit_client_reuses_event_store_and_access_grant(app_settings) -> No
     request_access.assert_called_once_with(fake_store)
 
 
+def test_eventkit_client_can_refresh_event_store_before_each_fetch(app_settings) -> None:
+    first_event = _make_ek_event(uid="event-1", notes="noted config:\nlocation_type: office\n")
+    updated_event = _make_ek_event(uid="event-1", notes="noted config:\nlocation_type: home\n")
+    events_by_fetch = [[first_event], [updated_event]]
+
+    class RefreshingStore:
+        def __init__(self) -> None:
+            self.reset_count = 0
+
+        def reset(self) -> None:
+            self.reset_count += 1
+
+        def calendarsForEntityType_(self, event_type):
+            return []
+
+        def predicateForEventsWithStartDate_endDate_calendars_(self, start, end, calendars):
+            return "predicate"
+
+        def eventsMatchingPredicate_(self, predicate):
+            return events_by_fetch[self.reset_count - 1]
+
+    fake_store = RefreshingStore()
+
+    with patch("briefing.calendar._get_event_store", return_value=fake_store) as get_store, \
+         patch("briefing.calendar._request_access") as request_access, \
+         patch("briefing.calendar._ns_date", side_effect=lambda dt: dt):
+        client = EventKitClient(app_settings, refresh_before_fetch=True)
+        first = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+        updated = client.fetch_events(
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+
+    get_store.assert_called_once_with()
+    request_access.assert_called_once_with(fake_store)
+    assert fake_store.reset_count == 2
+    assert first[0].notes == "noted config:\nlocation_type: office\n"
+    assert updated[0].notes == "noted config:\nlocation_type: home\n"
+
+
 def test_eventkit_client_fetch_events_includes_all_day_when_configured(app_settings) -> None:
     app_settings.calendar.include_all_day = True
     all_day_event = _make_ek_event(uid="all-day-1", is_all_day=True)

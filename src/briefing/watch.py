@@ -43,7 +43,8 @@ def run_watch(
     logger = logging.getLogger("briefing.watch")
     now_provider = now_provider or (lambda: datetime.now().astimezone())
     sleep_fn = sleep_fn or time.sleep
-    calendar = calendar or EventKitClient(settings)
+    # Long-lived EKEventStore instances can return stale notes for recently copied or edited events.
+    calendar = calendar or EventKitClient(settings, refresh_before_fetch=True)
     state_store = StateStore(settings)
     exit_code = 0
 

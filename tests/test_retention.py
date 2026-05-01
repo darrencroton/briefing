@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from briefing.main import cli
-from briefing.retention import run_retention_sweep
+from briefing.retention import RetentionResult, run_retention_sweep, run_retention_sweep_best_effort
 
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[1] / "vendor" / "contracts" / "contracts"
@@ -133,3 +134,47 @@ def test_retention_cli_dry_run_outputs_json(
     assert payload["ok"] is True
     assert payload["dry_run"] is True
     assert payload["retention_days"] == 7
+
+
+def test_retention_best_effort_is_silent_when_nothing_happens(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    app_settings,
+) -> None:
+    result = RetentionResult(
+        ok=True,
+        dry_run=False,
+        sessions_root=str(app_settings.meeting_intelligence.sessions_root),
+        retention_days=7,
+        cutoff="2026-05-01T12:00:00+10:00",
+        scanned_sessions=1,
+    )
+    monkeypatch.setattr("briefing.retention.run_retention_sweep", lambda settings, dry_run=False: result)
+
+    with caplog.at_level(logging.INFO, logger="briefing.retention"):
+        run_retention_sweep_best_effort(app_settings)
+
+    assert caplog.records == []
+
+
+def test_retention_best_effort_logs_when_files_are_eligible(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    app_settings,
+) -> None:
+    result = RetentionResult(
+        ok=True,
+        dry_run=True,
+        sessions_root=str(app_settings.meeting_intelligence.sessions_root),
+        retention_days=7,
+        cutoff="2026-05-01T12:00:00+10:00",
+        scanned_sessions=1,
+        eligible_sessions=1,
+        trashed_files=["/tmp/session/audio/raw_room.wav"],
+    )
+    monkeypatch.setattr("briefing.retention.run_retention_sweep", lambda settings, dry_run=False: result)
+
+    with caplog.at_level(logging.INFO, logger="briefing.retention"):
+        run_retention_sweep_best_effort(app_settings, dry_run=True)
+
+    assert "Raw-audio retention sweep complete" in caplog.text

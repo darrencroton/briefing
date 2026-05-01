@@ -166,13 +166,14 @@ def _ekevent_to_meeting(event) -> MeetingEvent | None:
 class EventKitClient:
     """Calendar client using Apple EventKit framework."""
 
-    def __init__(self, settings: AppSettings):
+    def __init__(self, settings: AppSettings, *, refresh_before_fetch: bool = False):
         self.settings = settings
+        self.refresh_before_fetch = refresh_before_fetch
         self._store = None
         self._access_granted = False
 
     def _event_store(self):
-        """Return the long-lived EventKit store for this client."""
+        """Return the EventKit store for this client."""
         if self._store is None:
             self._store = _get_event_store()
         return self._store
@@ -183,6 +184,15 @@ class EventKitClient:
             return
         _request_access(store)
         self._access_granted = True
+
+    def _refresh_store(self, store) -> None:
+        """Refresh cached EventKit data without creating another EKEventStore."""
+        if not self.refresh_before_fetch:
+            return
+        if hasattr(store, "reset"):
+            store.reset()
+        elif hasattr(store, "refreshSourcesIfNecessary"):
+            store.refreshSourcesIfNecessary()
 
     def _get_calendars(self, store):
         """Resolve the calendar objects to query based on include/exclude settings."""
@@ -205,6 +215,7 @@ class EventKitClient:
         """Fetch events in a specific window."""
         store = self._event_store()
         self._ensure_access(store)
+        self._refresh_store(store)
         calendars = self._get_calendars(store)
         predicate = store.predicateForEventsWithStartDate_endDate_calendars_(
             _ns_date(start), _ns_date(end), calendars

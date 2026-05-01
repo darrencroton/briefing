@@ -112,7 +112,7 @@ def run_retention_sweep_best_effort(settings: AppSettings, *, dry_run: bool = Fa
             len(result.errors),
             result.errors,
         )
-    else:
+    elif result.eligible_sessions or result.trashed_files:
         LOGGER.info(
             "Raw-audio retention sweep complete: scanned=%d eligible=%d trashed=%d dry_run=%s",
             result.scanned_sessions,

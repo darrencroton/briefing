@@ -84,6 +84,30 @@ def test_watch_cycle_runs_retention_best_effort(monkeypatch, app_settings) -> No
     assert calls == [(app_settings, True)]
 
 
+def test_watch_refreshes_eventkit_store_per_poll(monkeypatch, app_settings) -> None:
+    refresh_values: list[bool] = []
+
+    class FakeEventKitClient:
+        def __init__(self, settings, *, refresh_before_fetch: bool = False) -> None:
+            refresh_values.append(refresh_before_fetch)
+
+        def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
+            return []
+
+    monkeypatch.setattr("briefing.watch.EventKitClient", FakeEventKitClient)
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=True,
+        now_provider=lambda: now,
+    )
+
+    assert exit_code == 0
+    assert refresh_values == [True]
+
+
 def test_watch_dry_run_does_not_block_later_real_launch(monkeypatch, app_settings) -> None:
     (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
         yaml.safe_dump(
