@@ -125,6 +125,16 @@ uv run briefing session-ingest --session-dir /path/to/session --dry-run
 uv run briefing session-reprocess --session-dir /path/to/session  # rerun from existing transcript
 ```
 
+For ad hoc recordings started from the `noted` menubar, `noted` must also be able to find a `briefing` command. From this repo:
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PWD/.venv/bin/briefing" "$HOME/.local/bin/briefing"
+which briefing
+```
+
+You can instead set `briefing_command` in `~/Library/Application Support/noted/settings.toml` to the absolute path of `.venv/bin/briefing`.
+
 ### 8. Install automation
 
 After the manual flow is working, install the `launchd` agents:

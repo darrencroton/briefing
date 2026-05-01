@@ -77,6 +77,16 @@ paths.series_dir = "user_config/series"
 
 For recording handoff, review `[meeting_intelligence]`. The defaults write session manifests under `sessions/`, call `noted`, and launch 90 seconds before the scheduled start. `noted` is configured separately in `~/Library/Application Support/noted/settings.toml`.
 
+For ad hoc recordings started from the `noted` menubar, `noted` needs to find a `briefing` command when it runs the completion handoff. The simplest local setup is:
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PWD/.venv/bin/briefing" "$HOME/.local/bin/briefing"
+which briefing
+```
+
+Alternatively, set `briefing_command` in `~/Library/Application Support/noted/settings.toml` to the absolute path of this repo's `.venv/bin/briefing`.
+
 If `briefing watch` runs on more than one Mac, configure `location_type` routing before enabling unattended launch. Set the normal target location with `default_location_type`, then set this Mac's location with `local_location_type` or with the host-name mapping shown later in this guide.
 
 ### 3. Grant Calendar access

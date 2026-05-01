@@ -19,6 +19,16 @@ uv run briefing watch --once --dry-run
 
 The selected LLM CLI must already be authenticated for non-interactive use before you install the batch LaunchAgent. The selected `noted` CLI in `user_config/settings.toml` must already be permissioned and usable before you install the watch LaunchAgent.
 
+If you use `noted` ad hoc recordings, also expose this repo's `briefing` executable so `noted` can run `briefing session-ingest` after completion:
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PWD/.venv/bin/briefing" "$HOME/.local/bin/briefing"
+which briefing
+```
+
+You can instead set `briefing_command` in `~/Library/Application Support/noted/settings.toml` to the absolute path of `.venv/bin/briefing`.
+
 ## Batch `briefing run`
 
 This keeps the existing pre-meeting note refresh flow.
