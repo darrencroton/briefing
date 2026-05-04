@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from .calendar import EventKitClient
-from .models import MeetingEvent
+from .models import MeetingEvent, SessionPlanState
 from .planning import (
     invalidate_stale_plans,
     invalidate_recording_paused_plans,
@@ -138,13 +138,20 @@ def _plan_and_maybe_launch(
     dry_run: bool,
 ) -> None:
     logger = logging.getLogger("briefing.watch")
+    existing_plan = state_store.load_session_plan_for_event(event)
+
+    # Retry sessions that were blocked by a concurrently running session. This check runs before
+    # the pre-roll guard so retries continue while the event window is open, even after event.start.
+    if existing_plan is not None and existing_plan.status == "launch_blocked":
+        _retry_blocked_launch(settings, state_store, event, existing_plan, now, dry_run=dry_run)
+        return
+
     if event.start <= now:
         return
     pre_roll_at = event.start - timedelta(seconds=settings.meeting_intelligence.pre_roll_seconds)
     if now < pre_roll_at:
         return
 
-    existing_plan = state_store.load_session_plan_for_event(event)
     if (
         existing_plan
         and plan_blocks_replanning(existing_plan)
@@ -205,7 +212,7 @@ def _plan_and_maybe_launch(
     updated = replace(
         plan,
         status=launch_status,
-        launched_at=now.isoformat(),
+        launched_at=now.isoformat() if launch_status == "launched" else plan.launched_at,
         launch_exit_code=completed.returncode,
     )
     state_store.save_session_plan(updated)
@@ -246,6 +253,71 @@ def _plan_and_maybe_launch(
     )
 
 
+def _retry_blocked_launch(
+    settings: AppSettings,
+    state_store: StateStore,
+    event: MeetingEvent,
+    plan: SessionPlanState,
+    now: datetime,
+    *,
+    dry_run: bool,
+) -> None:
+    logger = logging.getLogger("briefing.watch")
+    if event.end is not None and event.end <= now:
+        completion_path = _write_missed_launch_completion(plan, now)
+        updated = replace(
+            plan,
+            status="invalidated",
+            invalidated_at=now.isoformat(),
+            invalidation_reason="launch_blocked_window_closed",
+        )
+        state_store.save_session_plan(updated)
+        logger.warning(
+            "launch_blocked: event window closed without starting session_id=%s completion=%s",
+            plan.session_id,
+            completion_path,
+        )
+        return
+    if dry_run:
+        logger.info(
+            "Dry-run: would retry blocked launch session_id=%s manifest_path=%s",
+            plan.session_id,
+            plan.manifest_path,
+        )
+        return
+    command = [settings.meeting_intelligence.noted_command, "start", "--manifest", plan.manifest_path]
+    completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    launch_status = _launch_status_from_noted_start(completed, expected_session_id=plan.session_id)
+    if launch_status == "launch_blocked":
+        logger.info(
+            "noted start still blocked: session_id=%s exit_code=%d stdout=%r",
+            plan.session_id,
+            completed.returncode,
+            completed.stdout.strip(),
+        )
+        return
+    updated = replace(
+        plan,
+        status=launch_status,
+        launched_at=now.isoformat() if launch_status == "launched" else plan.launched_at,
+        launch_exit_code=completed.returncode,
+    )
+    state_store.save_session_plan(updated)
+    logger.info(
+        "noted start (retry) completed: %s",
+        json.dumps(
+            {
+                "session_id": plan.session_id,
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout.strip(),
+                "stderr": completed.stderr.strip(),
+                "plan_status": updated.status,
+            },
+            sort_keys=True,
+        ),
+    )
+
+
 def _launch_status_from_noted_start(
     completed: subprocess.CompletedProcess[str],
     *,
@@ -259,10 +331,40 @@ def _launch_status_from_noted_start(
         payload = json.loads(completed.stdout)
     except json.JSONDecodeError:
         return "launch_failed"
-    if (
-        isinstance(payload, dict)
-        and payload.get("error") == "session_already_running"
-        and payload.get("session_id") == expected_session_id
-    ):
+    if not isinstance(payload, dict) or payload.get("error") != "session_already_running":
+        return "launch_failed"
+    # running_session_id is the new field; fall back to session_id for older noted builds
+    running_id = payload.get("running_session_id") or payload.get("session_id")
+    if running_id == expected_session_id:
         return "launched"
-    return "launch_failed"
+    return "launch_blocked"
+
+
+def _write_missed_launch_completion(plan: SessionPlanState, now: datetime) -> Path:
+    output_dir = Path(plan.session_dir) / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    completion_path = output_dir / "completion.json"
+    payload = {
+        "schema_version": "1.0",
+        "session_id": plan.session_id,
+        "manifest_schema_version": _manifest_schema_version(plan),
+        "terminal_status": "failed",
+        "stop_reason": "startup_failure",
+        "audio_capture_ok": False,
+        "transcript_ok": False,
+        "diarization_ok": False,
+        "warnings": [],
+        "errors": ["launch_blocked_window_closed"],
+        "completed_at": now.isoformat(),
+    }
+    completion_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return completion_path
+
+
+def _manifest_schema_version(plan: SessionPlanState) -> str:
+    try:
+        manifest = json.loads(Path(plan.manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "1.0"
+    version = manifest.get("schema_version") if isinstance(manifest, dict) else None
+    return str(version) if version is not None else "1.0"

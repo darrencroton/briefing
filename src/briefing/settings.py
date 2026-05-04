@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from .bootstrap import default_settings_path, local_settings_path
+from .bootstrap import default_project_root, default_settings_path, local_settings_path
 from .coerce import optional_int as _optional_int, optional_str as _optional_str, parse_optional_bool
 from .location_routing import normalize_location_type
 from .models import (
@@ -177,7 +177,7 @@ _VALID_ASR_BACKENDS = ("whisperkit", "fluidaudio-parakeet", "sfspeech")
 def load_settings(repo_root: Path | None = None) -> AppSettings:
     """Load the main settings file."""
     if repo_root is None:
-        repo_root = Path.cwd()
+        repo_root = default_project_root()
     settings_path = local_settings_path(repo_root)
     if not settings_path.exists():
         raise FileNotFoundError(

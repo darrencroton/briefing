@@ -358,6 +358,41 @@ def test_invalidation_sweep_archives_cancelled_unlaunched_manifest(app_settings)
     assert list((app_settings.repo_root / "archive" / "manifests").glob("*.json"))
 
 
+def test_invalidation_sweep_archives_cancelled_launch_blocked_manifest(app_settings) -> None:
+    _write_series(
+        app_settings,
+        {
+            "series_id": "cas-strategy",
+            "display_name": "CAS Strategy Meeting",
+            "note_slug": "cas-strategy-meeting",
+            "match": {"title_any": ["CAS Strategy Meeting"]},
+        },
+    )
+    event = _event()
+    result = plan_event(
+        app_settings,
+        event,
+        events=[event],
+        now=datetime.fromisoformat("2026-04-13T09:58:30+10:00"),
+    )
+    assert result.manifest_path is not None
+    store = StateStore(app_settings)
+    plan = store.load_session_plan_for_event(event)
+    assert plan is not None
+    store.save_session_plan(replace(plan, status="launch_blocked", launch_exit_code=5))
+
+    invalidated = invalidate_stale_plans(
+        app_settings,
+        [],
+        now=datetime.fromisoformat("2026-04-13T10:01:00+10:00"),
+    )
+
+    assert [plan.invalidation_reason for plan in invalidated] == ["event_cancelled"]
+    assert not Path(result.manifest_path).exists()
+    plans = StateStore(app_settings).list_session_plans()
+    assert plans[0].status == "invalidated"
+
+
 def test_invalidation_sweep_archives_plan_when_calendar_location_moves_to_other_machine(app_settings) -> None:
     app_settings.meeting_intelligence.default_location_type = "office"
     app_settings.meeting_intelligence.local_location_type = "office"

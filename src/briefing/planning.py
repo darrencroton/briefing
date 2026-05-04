@@ -73,6 +73,7 @@ _VALIDATOR: Draft202012Validator | None = None
 _VALID_MODES = {"in_person", "online", "hybrid"}
 _VALID_AUDIO_STRATEGIES = {"room_mic", "mic_plus_system"}
 _VALID_ASR_BACKENDS = {"whisperkit", "fluidaudio-parakeet", "sfspeech"}
+_ACTIVE_UNLAUNCHED_STATUSES = {"planned", "launch_blocked"}
 _REPLAN_BLOCKING_STATUSES = {"invalidated", "launched", "launch_failed"}
 
 
@@ -429,7 +430,7 @@ def invalidate_stale_plans(
     series_configs = load_series_configs(settings)
     invalidated: list[SessionPlanState] = []
     for plan in store.list_session_plans():
-        if plan.status != "planned" or plan.launched_at:
+        if plan.status not in _ACTIVE_UNLAUNCHED_STATUSES or plan.launched_at:
             continue
         current = events_by_uid.get(plan.event_uid)
         if current is None:
@@ -470,7 +471,7 @@ def invalidate_recording_paused_plans(
     store = state_store or StateStore(settings)
     invalidated: list[SessionPlanState] = []
     for plan in store.list_session_plans():
-        if plan.status != "planned" or plan.launched_at:
+        if plan.status not in _ACTIVE_UNLAUNCHED_STATUSES or plan.launched_at:
             continue
         invalidated.append(_invalidate_plan(settings, store, plan, now, "scheduled_recording_disabled"))
     return invalidated

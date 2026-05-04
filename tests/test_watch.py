@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from briefing.models import MeetingEvent
 from briefing.planning import invalidate_stale_plans, plan_event
+from briefing.session.completion import read_completion
 from briefing.state import StateStore
 from briefing.watch import run_watch
 
@@ -376,7 +377,7 @@ def test_watch_treats_matching_session_already_running_as_launched(
     assert plans[0].launched_at is not None
 
 
-def test_watch_keeps_unrelated_session_already_running_as_launch_failed(
+def test_watch_keeps_unrelated_session_already_running_as_launch_blocked(
     monkeypatch,
     app_settings,
 ) -> None:
@@ -404,7 +405,7 @@ def test_watch_keeps_unrelated_session_already_running_as_launch_failed(
     def fake_run(command, **kwargs):
         return SimpleNamespace(
             returncode=5,
-            stdout='{"ok":false,"error":"session_already_running","session_id":"different-session"}',
+            stdout='{"ok":false,"error":"session_already_running","running_session_id":"other-session","session_id":"different-session"}',
             stderr="",
         )
 
@@ -419,8 +420,123 @@ def test_watch_keeps_unrelated_session_already_running_as_launch_failed(
     assert exit_code == 0
     plans = StateStore(app_settings).list_session_plans()
     assert len(plans) == 1
-    assert plans[0].status == "launch_failed"
+    assert plans[0].status == "launch_blocked"
     assert plans[0].launch_exit_code == 5
+    assert plans[0].launched_at is None
+
+
+def test_watch_retries_blocked_launch_when_blocker_clears(
+    monkeypatch,
+    app_settings,
+) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    # Event has started (start <= now) but end is in the future — retry window is open
+    now = datetime.fromisoformat("2026-04-13T10:05:00+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+    calls: list[str] = []
+
+    def fake_run_blocked(command, **kwargs):
+        calls.append("blocked")
+        return SimpleNamespace(
+            returncode=5,
+            stdout='{"ok":false,"error":"session_already_running","running_session_id":"other-session","session_id":"other-session"}',
+            stderr="",
+        )
+
+    def fake_run_success(command, **kwargs):
+        calls.append("success")
+        return SimpleNamespace(returncode=0, stdout='{"ok":true}', stderr="")
+
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run_blocked)
+    # First cycle: pre-roll fires, noted returns blocked
+    run_watch(app_settings, once=True, now_provider=lambda: now - timedelta(minutes=6), calendar=FakeCalendar([event]))
+    plans = StateStore(app_settings).list_session_plans()
+    assert plans[0].status == "launch_blocked"
+    assert plans[0].launched_at is None
+
+    # Second cycle: after event.start, retry path fires and succeeds
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run_success)
+    run_watch(app_settings, once=True, now_provider=lambda: now, calendar=FakeCalendar([event]))
+    plans = StateStore(app_settings).list_session_plans()
+    assert plans[0].status == "launched"
+    assert plans[0].launched_at is not None
+    assert len(calls) == 2
+
+
+def test_watch_marks_blocked_launch_invalidated_when_event_window_closes(
+    monkeypatch,
+    app_settings,
+) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=datetime.fromisoformat("2026-04-13T10:00:00+10:00"),
+        end=datetime.fromisoformat("2026-04-13T11:00:00+10:00"),
+        calendar_name="Work",
+    )
+
+    def fake_run_blocked(command, **kwargs):
+        return SimpleNamespace(
+            returncode=5,
+            stdout='{"ok":false,"error":"session_already_running","running_session_id":"other-session","session_id":"other-session"}',
+            stderr="",
+        )
+
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run_blocked)
+    # First cycle: pre-roll fires, noted returns blocked
+    pre_roll = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    run_watch(app_settings, once=True, now_provider=lambda: pre_roll, calendar=FakeCalendar([event]))
+    plans = StateStore(app_settings).list_session_plans()
+    assert plans[0].status == "launch_blocked"
+
+    # Second cycle: past event.end — window is closed, stop retrying
+    past_end = datetime.fromisoformat("2026-04-13T11:05:00+10:00")
+    monkeypatch.setattr("briefing.watch.subprocess.run", lambda *a, **kw: (_ for _ in ()).throw(AssertionError("should not call noted")))
+    run_watch(app_settings, once=True, now_provider=lambda: past_end, calendar=FakeCalendar([event]))
+    plans = StateStore(app_settings).list_session_plans()
+    assert plans[0].status == "invalidated"
+    assert plans[0].invalidation_reason == "launch_blocked_window_closed"
+    completion = json.loads((Path(plans[0].session_dir) / "outputs" / "completion.json").read_text(encoding="utf-8"))
+    assert completion["schema_version"] == "1.0"
+    assert completion["session_id"] == plans[0].session_id
+    assert completion["terminal_status"] == "failed"
+    assert completion["stop_reason"] == "startup_failure"
+    assert completion["audio_capture_ok"] is False
+    assert completion["transcript_ok"] is False
+    assert completion["diarization_ok"] is False
+    assert completion["errors"] == ["launch_blocked_window_closed"]
+    parsed = read_completion(Path(plans[0].session_dir))
+    assert parsed.terminal_status == "failed"
+    assert parsed.stop_reason == "startup_failure"
 
 
 def test_watch_launches_rewritten_reschedule_plan_without_duplicate(
