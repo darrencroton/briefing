@@ -184,7 +184,7 @@ uv run briefing session-reprocess --session-dir /path/to/noted/session
 
 `command` is optional. If it is blank or omitted, `briefing` uses the default executable name for the provider.
 
-`effort` may be blank, `low`, `medium`, or `high`.
+`effort` may be blank, `low`, `medium`, or `high` for most providers. OpenCode maps `effort` to its `--variant` flag and also accepts `none`, `minimal`, `xhigh`, and `max`; leave it blank for models without a matching variant.
 
 Legacy `claude_cli` is still accepted and normalized to `claude`.
 
@@ -199,8 +199,8 @@ Legacy `claude_cli` is still accepted and normalized to `claude`.
 - `gemini`
   Set `GEMINI_API_KEY`, or configure Vertex AI credentials with `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
 - `opencode`
-  For local LLMs: start Ollama (`ollama serve`) or LM Studio and enable the API server, then set `llm.model` to `ollama/model-name` or `lmstudio/model-name`.
-  For cloud providers: set the relevant API key environment variable, for example `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, then set `llm.model` to `anthropic/claude-sonnet-4-6` or similar.
+  For local LLMs: configure an OpenCode provider for Ollama or LM Studio, start Ollama (`ollama serve`) or LM Studio's API server, then set `llm.model` to `ollama/model-name` or `lmstudio/model-name`.
+  For cloud providers: run `opencode auth login`, use OpenCode's `/connect` flow, or set the relevant provider API key environment variable, then set `llm.model` to `provider/model`, such as `openai/gpt-5.2`.
   Install opencode: `npm install -g opencode-ai` or see https://opencode.ai/docs/.
 
 For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. OpenCode with local LLMs requires the local inference server to be running.
@@ -211,13 +211,13 @@ OpenCode uses a `provider/model` format for the `llm.model` setting. Examples:
 
 | Backend | Example model value |
 |---------|-------------------|
-| Ollama (local) | `ollama/llama3.2` |
-| LM Studio (local) | `lmstudio/my-model` |
-| Anthropic | `anthropic/claude-sonnet-4-6` |
-| OpenAI | `openai/gpt-4o` |
+| Ollama (local) | `ollama/llama2` |
+| LM Studio (local) | `lmstudio/google/gemma-3n-e4b` |
+| Anthropic | `anthropic/claude-sonnet-4-5-20250929` |
+| OpenAI | `openai/gpt-5.2` |
 | Groq | `groq/llama-3.1-70b-versatile` |
 
-OpenCode ignores `llm.effort` when the configured model does not support reasoning variants, and maps `llm.effort` to the `--variant` flag otherwise.
+OpenCode maps `llm.effort` to the `--variant` flag. Built-in variants are provider-specific: common OpenAI variants include `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`; Anthropic commonly supports `high` and `max`.
 
 ### Example `[llm]` blocks
 
@@ -241,7 +241,7 @@ OpenCode with a local Ollama model:
 [llm]
 provider = "opencode"
 command = ""
-model = "ollama/llama3.2"
+model = "ollama/llama2"
 effort = ""
 timeout_seconds = 600
 retry_attempts = 3
@@ -257,7 +257,7 @@ OpenCode with a cloud provider:
 [llm]
 provider = "opencode"
 command = ""
-model = "anthropic/claude-sonnet-4-6"
+model = "openai/gpt-5.2"
 effort = "high"
 timeout_seconds = 600
 retry_attempts = 3
@@ -406,9 +406,9 @@ uv run briefing retention-sweep --dry-run
 
 - `provider`: `claude`, `codex`, `copilot`, `gemini`, or `opencode`
 - `command`: optional executable override
-- `model`: provider-specific model name; opencode uses `provider/model` format (e.g. `ollama/llama3.2`)
-- `effort`: blank, `low`, `medium`, or `high`
-- `timeout_seconds`: timeout for one LLM call
+- `model`: provider-specific model name; opencode uses `provider/model` format (e.g. `ollama/llama2`)
+- `effort`: blank, `low`, `medium`, or `high` for most providers; OpenCode also accepts `none`, `minimal`, `xhigh`, and `max`
+- `timeout_seconds`: timeout for one LLM call; OpenCode validation uses a shorter readiness timeout
 - `retry_attempts`: retained in config but not used by the current provider implementation
 - `temperature`: retained in config but not used by the current provider implementation
 - `max_output_tokens`: retained in config but not used by the current provider implementation
@@ -416,7 +416,7 @@ uv run briefing retention-sweep --dry-run
 - `note_template`: note template filename under `user_config/templates/`
 - `briefing` does not apply a separate global prompt truncation step after source collection; source-specific `max_characters` settings are the real input budget
 
-Gemini ignores `llm.effort` and uses Gemini defaults. OpenCode maps `llm.effort` to the `--variant` flag; models that do not support variants ignore it.
+Gemini ignores `llm.effort` and uses Gemini defaults. OpenCode maps `llm.effort` to the `--variant` flag; leave it blank if the selected model has no matching variant.
 
 ### `[slack]`
 

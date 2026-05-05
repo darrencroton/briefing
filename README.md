@@ -65,9 +65,9 @@ Authenticate your chosen provider before installing automation:
 - `codex` → `codex login`
 - `copilot` → `copilot login` (or set `COPILOT_GITHUB_TOKEN`)
 - `gemini` → set `GEMINI_API_KEY` (or configure Vertex AI credentials)
-- `opencode` → for local LLMs, start Ollama or LM Studio; for cloud providers, set the relevant API key (e.g. `ANTHROPIC_API_KEY`)
+- `opencode` → run `opencode auth login` or set the relevant provider API key; for local LLMs, configure and start Ollama or LM Studio
 
-**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `opencode` uses `provider/model` format (e.g. `ollama/llama3.2`).
+**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `opencode` uses `provider/model` format (e.g. `ollama/llama2` or `openai/gpt-5.2`).
 
 The full settings reference is in [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md).
 

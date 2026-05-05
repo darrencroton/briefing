@@ -354,23 +354,50 @@ class CopilotCLIProvider(CLIProvider):
 
 
 class OpenCodeCLIProvider(CLIProvider):
-    """OpenCode (sst/opencode) provider for local LLMs and cloud APIs."""
+    """OpenCode provider for local LLMs and cloud APIs."""
 
     cli_command = "opencode"
-    extra_flags = ("run", "--dangerously-skip-permissions", "--format", "json")
+    extra_flags = ("run", "--format", "json")
     model_flag = "--model"
     effort_flag = "--variant"
 
     def _validate_runtime_ready(self) -> str | None:
+        if not self.settings.llm.model:
+            return (
+                "OpenCode requires [llm].model for predictable automation. "
+                "Set it to provider/model format, e.g. ollama/llama2 or openai/gpt-5.2."
+            )
+        if "/" not in self.settings.llm.model:
+            return (
+                "OpenCode [llm].model must use provider/model format, "
+                f"got {self.settings.llm.model!r}."
+            )
+
         result = self._run_readiness_check([self.command, "--version"])
-        if result.returncode == 0:
-            return None
-        return (
-            "OpenCode is installed but could not be verified. "
-            "Run `opencode --version` to diagnose the issue. "
-            "For local LLMs, ensure Ollama (port 11434) or LM Studio (port 1234) is running, "
-            "and set llm.model to provider/model format, e.g. ollama/llama3.2."
-        )
+        if result.returncode != 0:
+            return (
+                "OpenCode is installed but could not be verified. "
+                "Run `opencode --version` to diagnose the issue."
+            )
+
+        command = self._build_command("Reply with exactly OK.")
+        result = self._run_readiness_check(command)
+        if result.returncode != 0:
+            return (
+                "OpenCode CLI is installed but did not complete a non-interactive readiness check. "
+                f"{self._format_command_failure(result)}"
+            )
+        try:
+            self._parse_output(result)
+        except LLMError as exc:
+            error_output = self._error_output(result)
+            hint = self._error_hint(error_output)
+            hint_text = f" {hint}" if hint else ""
+            return (
+                "OpenCode CLI is installed but did not complete a non-interactive readiness check. "
+                f"{exc}{hint_text}"
+            )
+        return None
 
     def _error_hint(self, error_output: str) -> str | None:
         lowered = error_output.lower()
@@ -388,6 +415,7 @@ class OpenCodeCLIProvider(CLIProvider):
 
     def _parse_output(self, completed: subprocess.CompletedProcess[str]) -> str:
         parts: list[str] = []
+        errors: list[str] = []
         for line in completed.stdout.splitlines():
             line = line.strip()
             if not line:
@@ -396,14 +424,41 @@ class OpenCodeCLIProvider(CLIProvider):
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if event.get("type") == "error":
+                errors.append(self._format_event_error(event))
+                continue
             if event.get("type") == "text":
                 text = event.get("part", {}).get("text", "")
                 if text:
                     parts.append(text)
+        if errors:
+            message = "; ".join(errors)
+            hint = self._error_hint(message)
+            hint_text = f" {hint}" if hint else ""
+            raise LLMError(f"opencode returned error: {message}{hint_text}")
         text = "".join(parts).strip()
         if not text:
             raise LLMError("opencode returned empty output")
         return text
+
+    @staticmethod
+    def _format_event_error(event: dict[str, object]) -> str:
+        error = event.get("error")
+        if isinstance(error, dict):
+            data = error.get("data")
+            if isinstance(data, dict):
+                message = data.get("message")
+                if message:
+                    return str(message)
+            message = error.get("message")
+            if message:
+                return str(message)
+            name = error.get("name")
+            if name:
+                return str(name)
+        if error:
+            return str(error)
+        return "unknown error"
 
 
 _PROVIDERS = {

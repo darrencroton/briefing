@@ -304,18 +304,55 @@ def test_opencode_validate_accepts_working_binary(
 ) -> None:
     app_settings.llm.provider = "opencode"
     app_settings.llm.command = "opencode"
+    app_settings.llm.model = "ollama/llama2"
 
     provider = OpenCodeCLIProvider(app_settings)
-    provider._run_readiness_check = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "--version"],
-        0,
-        stdout="opencode 0.3.0\n",
-        stderr="",
-    )
+
+    def fake_readiness(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
+        if command == ["opencode", "--version"]:
+            return subprocess.CompletedProcess(command, 0, stdout="opencode 1.14.35\n", stderr="")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout='{"type":"text","part":{"text":"OK"}}\n',
+            stderr="",
+        )
+
+    provider._run_readiness_check = fake_readiness  # type: ignore[method-assign]
     ok, message = provider.validate()
 
     assert ok is True
     assert "opencode" in message
+
+
+def test_opencode_validate_requires_model(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    app_settings.llm.model = ""
+
+    provider = OpenCodeCLIProvider(app_settings)
+    ok, message = provider.validate()
+
+    assert ok is False
+    assert "provider/model" in message
+
+
+def test_opencode_validate_requires_provider_model_format(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    app_settings.llm.model = "llama2"
+
+    provider = OpenCodeCLIProvider(app_settings)
+    ok, message = provider.validate()
+
+    assert ok is False
+    assert "provider/model" in message
 
 
 def test_opencode_validate_returns_error_on_failure(
@@ -324,6 +361,7 @@ def test_opencode_validate_returns_error_on_failure(
 ) -> None:
     app_settings.llm.provider = "opencode"
     app_settings.llm.command = "opencode"
+    app_settings.llm.model = "ollama/llama2"
 
     provider = OpenCodeCLIProvider(app_settings)
     provider._run_readiness_check = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
@@ -336,6 +374,39 @@ def test_opencode_validate_returns_error_on_failure(
 
     assert ok is False
     assert "opencode --version" in message
+
+
+def test_opencode_validate_rejects_json_error_event(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    import json as _json
+
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    app_settings.llm.model = "invalid/invalid"
+
+    provider = OpenCodeCLIProvider(app_settings)
+
+    def fake_readiness(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
+        if command == ["opencode", "--version"]:
+            return subprocess.CompletedProcess(command, 0, stdout="opencode 1.14.35\n", stderr="")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=_json.dumps({
+                "type": "error",
+                "error": {"data": {"message": "Model not found: invalid/invalid."}},
+            }),
+            stderr="",
+        )
+
+    provider._run_readiness_check = fake_readiness  # type: ignore[method-assign]
+
+    ok, message = provider.validate()
+
+    assert ok is False
+    assert "Model not found: invalid/invalid" in message
 
 
 def test_opencode_builds_command_with_model_and_effort(
@@ -352,7 +423,6 @@ def test_opencode_builds_command_with_model_and_effort(
     assert provider._build_command("prompt") == [
         "opencode",
         "run",
-        "--dangerously-skip-permissions",
         "--format",
         "json",
         "--model",
@@ -377,7 +447,6 @@ def test_opencode_builds_command_without_effort(
     assert provider._build_command("prompt") == [
         "opencode",
         "run",
-        "--dangerously-skip-permissions",
         "--format",
         "json",
         "--model",
@@ -437,6 +506,34 @@ def test_opencode_generate_raises_on_empty_text_events(
     )
 
     with pytest.raises(LLMError, match="empty output"):
+        provider.generate("prompt body")
+
+
+def test_opencode_generate_raises_on_json_error_event(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    import json as _json
+
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    provider = OpenCodeCLIProvider(app_settings)
+
+    ndjson_output = _json.dumps({
+        "type": "error",
+        "error": {
+            "name": "UnknownError",
+            "data": {"message": "Model not found: invalid/invalid."},
+        },
+    })
+    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "run"],
+        0,
+        stdout=ndjson_output,
+        stderr="",
+    )
+
+    with pytest.raises(LLMError, match="Model not found: invalid/invalid"):
         provider.generate("prompt body")
 
 

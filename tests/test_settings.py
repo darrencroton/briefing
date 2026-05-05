@@ -181,6 +181,30 @@ note_template = "meeting_note.md"
         load_settings(tmp_path)
 
 
+@pytest.mark.parametrize("effort", ["none", "minimal", "low", "medium", "high", "xhigh", "max"])
+def test_load_settings_accepts_opencode_variant_efforts(tmp_path: Path, effort: str) -> None:
+    _write_settings(
+        tmp_path,
+        f"""
+provider = "opencode"
+command = ""
+model = "openai/gpt-5.2"
+effort = "{effort}"
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+""",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.llm.command == "opencode"
+    assert settings.llm.effort == effort
+
+
 def test_load_settings_uses_default_command_when_blank(tmp_path: Path) -> None:
     _write_settings(
         tmp_path,

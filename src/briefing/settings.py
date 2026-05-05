@@ -163,6 +163,9 @@ class AppSettings:
 _SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini", "opencode")
 _LEGACY_LLM_PROVIDERS = {"claude_cli": "claude"}
 _VALID_LLM_EFFORTS = ("low", "medium", "high")
+_VALID_LLM_EFFORTS_BY_PROVIDER = {
+    "opencode": ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+}
 _DEFAULT_LLM_COMMANDS = {
     "claude": "claude",
     "codex": "codex",
@@ -572,10 +575,11 @@ def _parse_llm_settings(raw: Any) -> dict[str, Any]:
 
     raw_effort = raw.get("effort")
     effort = str(raw_effort).strip().lower() if raw_effort is not None else ""
-    if effort and effort not in _VALID_LLM_EFFORTS:
+    valid_efforts = _VALID_LLM_EFFORTS_BY_PROVIDER.get(provider, _VALID_LLM_EFFORTS)
+    if effort and effort not in valid_efforts:
         raise SettingsError(
             "Invalid settings file: [llm].effort must be blank or one of "
-            f"{', '.join(_VALID_LLM_EFFORTS)}."
+            f"{', '.join(valid_efforts)} for provider {provider!r}."
         )
 
     parsed = dict(raw)
