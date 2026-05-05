@@ -43,7 +43,7 @@ default_diarization_enabled = true
 # These defaults control noted's calendar-driven recording and end-of-meeting behaviour.
 auto_start = true
 auto_stop = true
-default_extension_minutes = 10
+default_extension_minutes = 5
 max_single_extension_minutes = 15
 pre_end_prompt_minutes = 5
 no_interaction_grace_minutes = 5
