@@ -36,7 +36,7 @@ Only meetings you have explicitly configured are processed. If a required source
 - Python 3.13+ and `uv` on `PATH`
 - One supported LLM CLI, authenticated for non-interactive use
 
-Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`
+Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`, `opencode`
 
 For recording: `noted` installed and on `PATH` (see the [`noted` repo](../noted/README.md))
 
@@ -54,7 +54,7 @@ Edit `user_config/settings.toml` to set your LLM provider and notes location. Th
 
 ```toml
 [llm]
-provider = "copilot"    # or claude, codex, gemini
+provider = "copilot"    # or claude, codex, gemini, opencode
 model = "claude-sonnet-4.6"
 effort = "high"
 ```
@@ -65,8 +65,9 @@ Authenticate your chosen provider before installing automation:
 - `codex` → `codex login`
 - `copilot` → `copilot login` (or set `COPILOT_GITHUB_TOKEN`)
 - `gemini` → set `GEMINI_API_KEY` (or configure Vertex AI credentials)
+- `opencode` → for local LLMs, start Ollama or LM Studio; for cloud providers, set the relevant API key (e.g. `ANTHROPIC_API_KEY`)
 
-**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`).
+**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `opencode` uses `provider/model` format (e.g. `ollama/llama3.2`).
 
 The full settings reference is in [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md).
 

@@ -57,7 +57,7 @@ Setup:
 - creates local runtime directories
 - validates the configured LLM provider when possible
 
-The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you choose another provider, rerun setup after updating `[llm]`.
+The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you choose another provider, rerun setup after updating `[llm]`. For `opencode` with a local model, ensure Ollama or LM Studio is running before running setup.
 
 ### 2. Edit `user_config/settings.toml`
 
@@ -180,6 +180,7 @@ uv run briefing session-reprocess --session-dir /path/to/noted/session
 - `codex`
 - `copilot`
 - `gemini`
+- `opencode`
 
 `command` is optional. If it is blank or omitted, `briefing` uses the default executable name for the provider.
 
@@ -197,8 +198,26 @@ Legacy `claude_cli` is still accepted and normalized to `claude`.
   Run `copilot login`, or set `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`.
 - `gemini`
   Set `GEMINI_API_KEY`, or configure Vertex AI credentials with `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
+- `opencode`
+  For local LLMs: start Ollama (`ollama serve`) or LM Studio and enable the API server, then set `llm.model` to `ollama/model-name` or `lmstudio/model-name`.
+  For cloud providers: set the relevant API key environment variable, for example `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, then set `llm.model` to `anthropic/claude-sonnet-4-6` or similar.
+  Install opencode: `npm install -g opencode-ai` or see https://opencode.ai/docs/.
 
-For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth.
+For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. OpenCode with local LLMs requires the local inference server to be running.
+
+### OpenCode model format
+
+OpenCode uses a `provider/model` format for the `llm.model` setting. Examples:
+
+| Backend | Example model value |
+|---------|-------------------|
+| Ollama (local) | `ollama/llama3.2` |
+| LM Studio (local) | `lmstudio/my-model` |
+| Anthropic | `anthropic/claude-sonnet-4-6` |
+| OpenAI | `openai/gpt-4o` |
+| Groq | `groq/llama-3.1-70b-versatile` |
+
+OpenCode ignores `llm.effort` when the configured model does not support reasoning variants, and maps `llm.effort` to the `--variant` flag otherwise.
 
 ### Example `[llm]` blocks
 
@@ -207,6 +226,38 @@ For scheduled automation, the chosen provider must already work without an inter
 provider = "copilot"
 command = ""
 model = "claude-sonnet-4.6"
+effort = "high"
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+```
+
+OpenCode with a local Ollama model:
+
+```toml
+[llm]
+provider = "opencode"
+command = ""
+model = "ollama/llama3.2"
+effort = ""
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+```
+
+OpenCode with a cloud provider:
+
+```toml
+[llm]
+provider = "opencode"
+command = ""
+model = "anthropic/claude-sonnet-4-6"
 effort = "high"
 timeout_seconds = 600
 retry_attempts = 3
@@ -353,9 +404,9 @@ uv run briefing retention-sweep --dry-run
 
 ### `[llm]`
 
-- `provider`: `claude`, `codex`, `copilot`, or `gemini`
+- `provider`: `claude`, `codex`, `copilot`, `gemini`, or `opencode`
 - `command`: optional executable override
-- `model`: provider-specific model name
+- `model`: provider-specific model name; opencode uses `provider/model` format (e.g. `ollama/llama3.2`)
 - `effort`: blank, `low`, `medium`, or `high`
 - `timeout_seconds`: timeout for one LLM call
 - `retry_attempts`: retained in config but not used by the current provider implementation
@@ -365,7 +416,7 @@ uv run briefing retention-sweep --dry-run
 - `note_template`: note template filename under `user_config/templates/`
 - `briefing` does not apply a separate global prompt truncation step after source collection; source-specific `max_characters` settings are the real input budget
 
-Gemini ignores `llm.effort` and uses Gemini defaults.
+Gemini ignores `llm.effort` and uses Gemini defaults. OpenCode maps `llm.effort` to the `--variant` flag; models that do not support variants ignore it.
 
 ### `[slack]`
 
@@ -437,6 +488,7 @@ Usually one of:
 - the CLI is not authenticated for unattended use
 - `[llm].provider` is invalid
 - Gemini is configured only through interactive Google OAuth instead of API-key or Vertex-style automation credentials
+- OpenCode is configured with a local model but the inference server (Ollama or LM Studio) is not running
 
 ### `run` does nothing
 

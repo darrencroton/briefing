@@ -12,6 +12,7 @@ from briefing.llm import (
     CopilotCLIProvider,
     GeminiCLIProvider,
     LLMError,
+    OpenCodeCLIProvider,
 )
 
 
@@ -295,3 +296,181 @@ def test_copilot_validate_rejects_generic_github_auth_without_copilot_access(
     assert ok is False
     assert "Copilot CLI is installed but did not complete a non-interactive readiness check." in message
     assert "Copilot CLI access" in message
+
+
+def test_opencode_validate_accepts_working_binary(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+
+    provider = OpenCodeCLIProvider(app_settings)
+    provider._run_readiness_check = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "--version"],
+        0,
+        stdout="opencode 0.3.0\n",
+        stderr="",
+    )
+    ok, message = provider.validate()
+
+    assert ok is True
+    assert "opencode" in message
+
+
+def test_opencode_validate_returns_error_on_failure(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+
+    provider = OpenCodeCLIProvider(app_settings)
+    provider._run_readiness_check = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "--version"],
+        1,
+        stdout="",
+        stderr="opencode: command not found",
+    )
+    ok, message = provider.validate()
+
+    assert ok is False
+    assert "opencode --version" in message
+
+
+def test_opencode_builds_command_with_model_and_effort(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    app_settings.llm.model = "ollama/llama3.2"
+    app_settings.llm.effort = "medium"
+
+    provider = OpenCodeCLIProvider(app_settings)
+
+    assert provider._build_command("prompt") == [
+        "opencode",
+        "run",
+        "--model",
+        "ollama/llama3.2",
+        "--variant",
+        "medium",
+        "--dangerously-skip-permissions",
+        "--format",
+        "json",
+        "prompt",
+    ]
+
+
+def test_opencode_builds_command_without_effort(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    app_settings.llm.model = "anthropic/claude-sonnet-4-6"
+    app_settings.llm.effort = ""
+
+    provider = OpenCodeCLIProvider(app_settings)
+
+    assert provider._build_command("prompt") == [
+        "opencode",
+        "run",
+        "--model",
+        "anthropic/claude-sonnet-4-6",
+        "--dangerously-skip-permissions",
+        "--format",
+        "json",
+        "prompt",
+    ]
+
+
+def test_opencode_generate_parses_ndjson_text_events(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    import json as _json
+
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    provider = OpenCodeCLIProvider(app_settings)
+
+    ndjson_output = "\n".join([
+        _json.dumps({"type": "step_start", "timestamp": 1, "sessionID": "s1", "part": {"type": "step-start"}}),
+        _json.dumps({"type": "text", "timestamp": 2, "sessionID": "s1", "part": {"type": "text", "text": "Hello, "}}),
+        _json.dumps({"type": "text", "timestamp": 3, "sessionID": "s1", "part": {"type": "text", "text": "world!"}}),
+        _json.dumps({"type": "step_finish", "timestamp": 4, "sessionID": "s1", "part": {"type": "step-finish"}}),
+    ])
+    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "run"],
+        0,
+        stdout=ndjson_output,
+        stderr="",
+    )
+
+    response = provider.generate("prompt body")
+
+    assert response.text == "Hello, world!"
+    assert response.raw == ndjson_output
+
+
+def test_opencode_generate_raises_on_empty_text_events(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    import json as _json
+
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    provider = OpenCodeCLIProvider(app_settings)
+
+    ndjson_output = "\n".join([
+        _json.dumps({"type": "step_start", "timestamp": 1, "sessionID": "s1", "part": {}}),
+        _json.dumps({"type": "step_finish", "timestamp": 2, "sessionID": "s1", "part": {}}),
+    ])
+    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "run"],
+        0,
+        stdout=ndjson_output,
+        stderr="",
+    )
+
+    with pytest.raises(LLMError, match="empty output"):
+        provider.generate("prompt body")
+
+
+def test_opencode_generate_adds_connection_hint(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    provider = OpenCodeCLIProvider(app_settings)
+    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "run"],
+        1,
+        stdout="",
+        stderr="connect: connection refused 127.0.0.1:11434",
+    )
+
+    with pytest.raises(LLMError, match=r"port 11434"):
+        provider.generate("prompt")
+
+
+def test_opencode_generate_adds_api_key_hint(
+    cli_on_path: None,
+    app_settings,
+) -> None:
+    app_settings.llm.provider = "opencode"
+    app_settings.llm.command = "opencode"
+    provider = OpenCodeCLIProvider(app_settings)
+    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
+        ["opencode", "run"],
+        1,
+        stdout="",
+        stderr="Unauthorized: invalid API key",
+    )
+
+    with pytest.raises(LLMError, match=r"API key"):
+        provider.generate("prompt")

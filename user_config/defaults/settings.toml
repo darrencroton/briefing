@@ -66,7 +66,8 @@ lookback_days_for_init = 14
 provider = "copilot"
 # Leave command blank to use the provider default executable.
 command = ""
-# Model names are provider-specific; copilot uses dot notation such as claude-sonnet-4.6.
+# Model names are provider-specific; copilot uses dot notation such as claude-sonnet-4.6;
+# opencode uses provider/model format such as ollama/llama3.2 or anthropic/claude-sonnet-4-6.
 model = "claude-sonnet-4.6"
 effort = "high"
 timeout_seconds = 600

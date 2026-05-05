@@ -160,7 +160,7 @@ class AppSettings:
     logging: LoggingSettings
 
 
-_SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini")
+_SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini", "opencode")
 _LEGACY_LLM_PROVIDERS = {"claude_cli": "claude"}
 _VALID_LLM_EFFORTS = ("low", "medium", "high")
 _DEFAULT_LLM_COMMANDS = {
@@ -168,6 +168,7 @@ _DEFAULT_LLM_COMMANDS = {
     "codex": "codex",
     "copilot": "copilot",
     "gemini": "gemini",
+    "opencode": "opencode",
 }
 _VALID_MODE_TYPES = ("in_person", "online", "hybrid")
 _VALID_AUDIO_STRATEGIES = ("room_mic", "mic_plus_system")

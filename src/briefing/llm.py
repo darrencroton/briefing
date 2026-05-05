@@ -353,11 +353,82 @@ class CopilotCLIProvider(CLIProvider):
         )
 
 
+class OpenCodeCLIProvider(CLIProvider):
+    """OpenCode (sst/opencode) provider — supports Ollama, LM Studio, and cloud LLMs.
+
+    Model must be specified in provider/model format, e.g. ollama/llama3.2 or
+    anthropic/claude-sonnet-4-6. See https://opencode.ai/docs/models/ for the full list.
+    """
+
+    cli_command = "opencode"
+    extra_flags = ("run",)
+    model_flag = "--model"
+    effort_flag = "--variant"
+    env_blocklist = ()
+    readiness_timeout_seconds = 30
+
+    def _append_prompt_args(self, command: list[str], prompt: str) -> None:
+        command.append(prompt)
+
+    def _build_command(self, prompt: str) -> list[str]:
+        command = [self.command, *self.extra_flags]
+        self._append_model_args(command)
+        self._append_effort_args(command)
+        command.extend(["--dangerously-skip-permissions", "--format", "json"])
+        self._append_prompt_args(command, prompt)
+        return command
+
+    def _validate_runtime_ready(self) -> str | None:
+        result = self._run_readiness_check([self.command, "--version"])
+        if result.returncode == 0:
+            return None
+        return (
+            "OpenCode is installed but could not be verified. "
+            "Run `opencode --version` to diagnose the issue. "
+            "For local LLMs, ensure Ollama (port 11434) or LM Studio (port 1234) is running, "
+            "and set llm.model to provider/model format, e.g. ollama/llama3.2."
+        )
+
+    def _error_hint(self, error_output: str) -> str | None:
+        lowered = error_output.lower()
+        if "unauthorized" in lowered or "api key" in lowered or "authentication" in lowered:
+            return (
+                "Set the appropriate API key environment variable for your provider "
+                "(for example ANTHROPIC_API_KEY or OPENAI_API_KEY) before using `briefing`."
+            )
+        if "connection refused" in lowered or "econnrefused" in lowered or "connect:" in lowered:
+            return (
+                "Ensure your local LLM server is running: "
+                "Ollama on port 11434 or LM Studio on port 1234."
+            )
+        return None
+
+    def _parse_output(self, completed: subprocess.CompletedProcess[str]) -> str:
+        parts: list[str] = []
+        for line in completed.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") == "text":
+                text = event.get("part", {}).get("text", "")
+                if text:
+                    parts.append(text)
+        text = "".join(parts).strip()
+        if not text:
+            raise LLMError("opencode returned empty output")
+        return text
+
+
 _PROVIDERS = {
     "claude": ClaudeCLIProvider,
     "codex": CodexCLIProvider,
     "copilot": CopilotCLIProvider,
     "gemini": GeminiCLIProvider,
+    "opencode": OpenCodeCLIProvider,
 }
 
 
