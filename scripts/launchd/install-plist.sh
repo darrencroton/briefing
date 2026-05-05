@@ -7,8 +7,11 @@ DEFAULT_PLIST="${REPO_ROOT}/tmp/launchd/com.user.briefing.plist"
 TARGET_PLIST="${1:-${DEFAULT_PLIST}}"
 INSTALL_PATH="${HOME}/Library/LaunchAgents/com.user.briefing.plist"
 
-if [[ ! -f "${TARGET_PLIST}" ]]; then
+if [[ $# -eq 0 ]]; then
   "${SCRIPT_DIR}/render-plist.sh"
+elif [[ ! -f "${TARGET_PLIST}" ]]; then
+  echo "Plist not found: ${TARGET_PLIST}" >&2
+  exit 1
 fi
 
 plutil -lint "${TARGET_PLIST}"
@@ -19,4 +22,3 @@ launchctl bootstrap "gui/$(id -u)" "${INSTALL_PATH}"
 launchctl enable "gui/$(id -u)/com.user.briefing"
 
 echo "Installed ${INSTALL_PATH}"
-

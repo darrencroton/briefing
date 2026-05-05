@@ -19,7 +19,7 @@ uv run briefing watch --once --dry-run
 
 The selected LLM CLI must already be authenticated for non-interactive use before you install the batch LaunchAgent. The selected `noted` CLI in `user_config/settings.toml` must already be permissioned and usable before you install the watch LaunchAgent.
 
-If you use `noted` ad hoc recordings, also expose this repo's `briefing` executable so `noted` can run `briefing session-ingest` after completion:
+If you use `noted` ad hoc recordings, expose this repo's `briefing` executable so `noted` can run `briefing session-ingest` after completion:
 
 ```bash
 mkdir -p "$HOME/.local/bin"
@@ -33,25 +33,15 @@ You can instead set `briefing_command` in `~/Library/Application Support/noted/s
 
 This keeps the existing pre-meeting note refresh flow.
 
-### Render the plist
-
-```bash
-./scripts/launchd/render-plist.sh
-```
-
-The rendered file is written to:
-
-```text
-tmp/launchd/com.user.briefing.plist
-```
-
-It includes the absolute `uv` path, repo root, log directory, and the current shell `PATH`.
-
-### Install the LaunchAgent
+### Install
 
 ```bash
 ./scripts/launchd/install-plist.sh
 ```
+
+The installer renders the plist, validates it, copies it to
+`~/Library/LaunchAgents/com.user.briefing.plist`, reloads the job, and enables
+it.
 
 ### Trigger a run immediately
 
@@ -63,23 +53,15 @@ launchctl kickstart -k gui/$(id -u)/com.user.briefing
 
 This installs the separate Meeting Intelligence watcher. It plans eligible sessions, keeps pre-written next manifests fresh, and invokes `noted start --manifest` at pre-roll.
 
-### Render the plist
-
-```bash
-./scripts/launchd/render-watch-plist.sh
-```
-
-The rendered file is written to:
-
-```text
-tmp/launchd/com.user.briefing-watch.plist
-```
-
-### Install the LaunchAgent
+### Install
 
 ```bash
 ./scripts/launchd/install-watch-plist.sh
 ```
+
+The installer renders the plist, validates it, copies it to
+`~/Library/LaunchAgents/com.user.briefing-watch.plist`, reloads the job, and
+enables it.
 
 ### Restart the watcher
 
@@ -99,42 +81,24 @@ tail -n 50 logs/launchd-watch.stderr.log
 
 ## Stop or uninstall a LaunchAgent
 
-Use `bootout` to stop a loaded job. This is the right way to cancel the
-long-running watcher because `com.user.briefing-watch` has `KeepAlive` enabled;
-killing the process directly can let `launchd` restart it.
-
-Uninstall all `briefing` LaunchAgents:
-
-```bash
-./scripts/launchd/uninstall-all.sh
-```
-
-The uninstall scripts stop the loaded job and move the installed plist from
+Use the uninstall scripts to stop loaded jobs and move installed plists from
 `~/Library/LaunchAgents` into `archive/launchd/`.
 
-Uninstall only the batch `briefing run` LaunchAgent:
-
 ```bash
+# Uninstall all briefing LaunchAgents.
+./scripts/launchd/uninstall-all.sh
+
+# Or uninstall one job.
 ./scripts/launchd/uninstall-plist.sh
-```
-
-Uninstall only the long-running `briefing watch` LaunchAgent:
-
-```bash
 ./scripts/launchd/uninstall-watch-plist.sh
 ```
 
-To stop a job without uninstalling it, run `bootout` directly.
-
-Stop the batch `briefing run` LaunchAgent:
+To stop a job without uninstalling it, use `bootout`. This matters for the
+watcher because `com.user.briefing-watch` has `KeepAlive` enabled; killing the
+process directly can let `launchd` restart it.
 
 ```bash
 launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.user.briefing.plist"
-```
-
-Stop the long-running `briefing watch` LaunchAgent:
-
-```bash
 launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.user.briefing-watch.plist"
 ```
 
@@ -154,4 +118,5 @@ the service could not be found.
 
 ## Update the job
 
-If you move this repo or your `uv` path changes, rerun `render-plist.sh` and reinstall.
+If you move this repo or your `uv` path changes, rerun the relevant install
+script. It will regenerate and reload the plist.
