@@ -352,13 +352,13 @@ def test_opencode_builds_command_with_model_and_effort(
     assert provider._build_command("prompt") == [
         "opencode",
         "run",
+        "--dangerously-skip-permissions",
+        "--format",
+        "json",
         "--model",
         "ollama/llama3.2",
         "--variant",
         "medium",
-        "--dangerously-skip-permissions",
-        "--format",
-        "json",
         "prompt",
     ]
 
@@ -377,11 +377,11 @@ def test_opencode_builds_command_without_effort(
     assert provider._build_command("prompt") == [
         "opencode",
         "run",
-        "--model",
-        "anthropic/claude-sonnet-4-6",
         "--dangerously-skip-permissions",
         "--format",
         "json",
+        "--model",
+        "anthropic/claude-sonnet-4-6",
         "prompt",
     ]
 

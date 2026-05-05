@@ -354,29 +354,12 @@ class CopilotCLIProvider(CLIProvider):
 
 
 class OpenCodeCLIProvider(CLIProvider):
-    """OpenCode (sst/opencode) provider — supports Ollama, LM Studio, and cloud LLMs.
-
-    Model must be specified in provider/model format, e.g. ollama/llama3.2 or
-    anthropic/claude-sonnet-4-6. See https://opencode.ai/docs/models/ for the full list.
-    """
+    """OpenCode (sst/opencode) provider for local LLMs and cloud APIs."""
 
     cli_command = "opencode"
-    extra_flags = ("run",)
+    extra_flags = ("run", "--dangerously-skip-permissions", "--format", "json")
     model_flag = "--model"
     effort_flag = "--variant"
-    env_blocklist = ()
-    readiness_timeout_seconds = 30
-
-    def _append_prompt_args(self, command: list[str], prompt: str) -> None:
-        command.append(prompt)
-
-    def _build_command(self, prompt: str) -> list[str]:
-        command = [self.command, *self.extra_flags]
-        self._append_model_args(command)
-        self._append_effort_args(command)
-        command.extend(["--dangerously-skip-permissions", "--format", "json"])
-        self._append_prompt_args(command, prompt)
-        return command
 
     def _validate_runtime_ready(self) -> str | None:
         result = self._run_readiness_check([self.command, "--version"])
