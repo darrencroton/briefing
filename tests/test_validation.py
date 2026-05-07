@@ -141,7 +141,7 @@ def test_sessions_root_not_writable_emits_error(tmp_path: Path, app_settings, mo
 # ---------------------------------------------------------------------------
 
 
-def _make_version_output(manifest_v: str = "1.0", completion_v: str = "1.0") -> str:
+def _make_version_output(manifest_v: str = "2.0", completion_v: str = "1.0") -> str:
     return json.dumps({
         "ok": True,
         "version": "0.3.0",
@@ -166,7 +166,7 @@ def test_noted_version_ok_emits_version_and_compat(monkeypatch) -> None:
 
 def test_noted_version_schema_compat_error_on_major_mismatch(monkeypatch) -> None:
     def mock_run(cmd, **kwargs):
-        return SimpleNamespace(returncode=0, stdout=_make_version_output(manifest_v="2.0"))
+        return SimpleNamespace(returncode=0, stdout=_make_version_output(manifest_v="1.0"))
 
     monkeypatch.setattr(subprocess, "run", mock_run)
     messages: list[ValidationMessage] = []

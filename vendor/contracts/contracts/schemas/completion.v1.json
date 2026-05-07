@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://briefing-noted-contracts/schemas/completion.v1.json",
   "title": "Session Completion File",
-  "description": "Canonical machine-readable final result of one session (§11.3). Written by noted at the end of post-processing. briefing reads this file first when deciding how to proceed; it must never be inferred from file presence or log parsing (guardrail 3).",
+  "description": "Canonical machine-readable final result of one session (§11.3). Usually written by noted at the end of post-processing; briefing watch may also write a failed startup completion when a planned launch never starts before the event window closes. briefing reads this file first when deciding how to proceed; it must never be inferred from file presence or log parsing (guardrail 3).",
   "type": "object",
   "required": [
     "schema_version",

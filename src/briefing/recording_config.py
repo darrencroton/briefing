@@ -66,10 +66,12 @@ def recording_config_from_mapping(raw: dict[str, Any]) -> RecordingConfig:
 
     mode = raw.get("mode")
     mode_type = None
-    audio_strategy = raw.get("audio_strategy")
+    if raw.get("audio_strategy") is not None:
+        raise RecordingConfigError("noted config audio_strategy has been removed; set mode instead")
     if isinstance(mode, dict):
+        if mode.get("audio_strategy") is not None:
+            raise RecordingConfigError("noted config mode.audio_strategy has been removed; set mode.type instead")
         mode_type = _optional_str(mode.get("type"))
-        audio_strategy = mode.get("audio_strategy", audio_strategy)
     else:
         mode_type = _optional_str(mode)
 
@@ -77,7 +79,6 @@ def recording_config_from_mapping(raw: dict[str, Any]) -> RecordingConfig:
         record=_optional_bool(raw.get("record")),
         location_type=normalize_location_type(_optional_str(raw.get("location_type"))),
         mode=mode_type,
-        audio_strategy=_optional_str(audio_strategy),
         host_name=_optional_str(participants.get("host_name", raw.get("host_name"))),
         attendees_expected=_optional_int(participants.get("attendees_expected", raw.get("attendees_expected"))),
         participant_names=[

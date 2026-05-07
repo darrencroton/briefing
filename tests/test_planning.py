@@ -82,6 +82,11 @@ def test_parse_noted_config_accepts_location_type() -> None:
     assert config.location_type == "home_office"
 
 
+def test_parse_noted_config_rejects_removed_audio_strategy() -> None:
+    with pytest.raises(PlanningError, match="audio_strategy has been removed"):
+        parse_noted_config("noted config\nmode: online\naudio_strategy: mic_plus_system\n")
+
+
 def test_series_matched_event_uses_noted_config_field_overrides(app_settings) -> None:
     _write_series(
         app_settings,
@@ -224,6 +229,7 @@ def test_assemble_manifest_validates_against_contract(app_settings, series_confi
     errors = list(manifest_validator().iter_errors(manifest))
     assert errors == []
     assert manifest["session_id"] == "2026-04-13T100000+1000-cas-strategy-meeting"
+    assert manifest["mode"] == {"type": "in_person"}
     assert manifest["paths"]["note_path"].endswith("2026-04-13-1000-cas-strategy-meeting.md")
     assert manifest["transcription"]["speaker_count_hint"] == 2
 
@@ -321,8 +327,10 @@ def test_plan_event_prewrites_next_manifest_and_state(app_settings) -> None:
     assert result.manifest_path is not None
     assert result.next_manifest_path is not None
     current = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+    next_manifest = json.loads(Path(result.next_manifest_path).read_text(encoding="utf-8"))
     assert current["next_meeting"]["exists"] is True
     assert current["next_meeting"]["manifest_path"] == result.next_manifest_path
+    assert next_manifest["mode"] == {"type": "online"}
     assert Path(result.next_manifest_path).exists()
     plans = StateStore(app_settings).list_session_plans()
     assert {plan.event_uid for plan in plans} == {"event-1", "event-2"}

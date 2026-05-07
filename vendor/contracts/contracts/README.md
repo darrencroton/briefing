@@ -4,13 +4,13 @@ Neutral contracts between `briefing` (Python orchestration) and `noted` (Swift c
 
 This directory lives inside the root repository `briefing-noted-contracts` but is the versioned surface consumers pin to. Schemas, CLI contract, on-disk layout, and vocabulary are the only things here. There is no code.
 
-The three JSON Schemas in `schemas/` are **executable contracts**, not documentation. Consumers are expected to validate their payloads against them directly with a standard JSON Schema library (e.g. Python `jsonschema`, Swift `JSONSchema`) at build time and at runtime boundaries. Consumers must enable JSON Schema `format` assertion when validating timestamp fields; the schemas combine `format: date-time` for RFC 3339 shape with a suffix pattern for the explicit-offset guardrail. Compatibility semantics — how the `schema_version` pattern, closed enums, and `additionalProperties: true` interact — are specified in `versioning-policy.md`.
+The JSON Schemas in `schemas/` are **executable contracts**, not documentation. Consumers are expected to validate their payloads against them directly with a standard JSON Schema library (e.g. Python `jsonschema`, Swift `JSONSchema`) at build time and at runtime boundaries. Consumers must enable JSON Schema `format` assertion when validating timestamp fields; the schemas combine `format: date-time` for RFC 3339 shape with a suffix pattern for the explicit-offset guardrail. Compatibility semantics — how the `schema_version` pattern, closed enums, and `additionalProperties: true` interact — are specified in `versioning-policy.md`.
 
 ## What's in this directory
 
 | File | Purpose |
 |------|---------|
-| `schemas/manifest.v1.json` | JSON Schema for the session manifest (Master Plan §8). |
+| `schemas/manifest.v2.json` | JSON Schema for the session manifest (Master Plan §8). |
 | `schemas/completion.v1.json` | JSON Schema for the session completion file (§11.3). |
 | `schemas/runtime-status.v1.json` | JSON Schema for the runtime status file (§10.3). |
 | `cli-contract.md` | `noted`'s CLI surface: commands, exit codes, stdout JSON shapes (§9). |
@@ -31,9 +31,9 @@ Each consumer repo carries the whole `briefing-noted-contracts` root as a submod
 ```bash
 # in briefing/ or noted/
 git submodule add https://github.com/darrencroton/briefing-noted-contracts.git vendor/contracts
-git -C vendor/contracts checkout v1.0.1
+git -C vendor/contracts checkout v2.0.0
 git add .gitmodules vendor/contracts
-git commit -m "Pin contracts to v1.0.1"
+git commit -m "Pin contracts to v2.0.0"
 ```
 
 Consumers then read schemas from `vendor/contracts/contracts/schemas/...`.
@@ -42,9 +42,9 @@ Bumping:
 
 ```bash
 git -C vendor/contracts fetch --tags
-git -C vendor/contracts checkout v1.1.0
+git -C vendor/contracts checkout v2.0.0
 git add vendor/contracts
-git commit -m "Bump contracts pin to v1.1.0"
+git commit -m "Bump contracts pin to v2.0.0"
 ```
 
 ### Option B — tarball fetch at tag
@@ -77,10 +77,6 @@ Contracts commits that are not tagged are not considered released. Never emit a 
 - `noted` is not allowed to compose a manifest from calendar data. Only `briefing` does that. The contracts reflect this by keeping manifest construction a `briefing`-owned concern (guardrails 4, 8, 11).
 - Multi-Mac `meeting.location_type` routing is `briefing` policy. `noted` may carry the field through validation/logging, but it must not interpret it to make calendar or workflow decisions.
 - Raw audio is the primary asset and is preserved whenever capture succeeds (guardrail 10). The session-directory contract codifies this with the file-requirements table.
-
-## Phase 1 status
-
-v1.0.0 closes Phase 1 (Lock Contracts) of the master plan. All decisions in §27 that shape Phase 1 artefacts are recorded in the master plan itself and reflected here. Phase 2 work on `noted` may begin once this tag exists.
 
 ## Consuming project structure
 

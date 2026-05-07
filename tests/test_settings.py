@@ -410,6 +410,26 @@ recording:
         load_series_configs(app_settings)
 
 
+def test_load_series_configs_rejects_removed_audio_strategy(app_settings) -> None:
+    (app_settings.paths.series_dir / "bad.yaml").write_text(
+        """
+series_id: bad
+display_name: Bad
+note_slug: bad
+match:
+  title_any:
+    - Bad
+recording:
+  mode: online
+  audio_strategy: mic_plus_system
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="audio_strategy has been removed"):
+        load_series_configs(app_settings)
+
+
 def _write_mi_settings(tmp_path: Path, overrides: dict) -> None:
     """Write a minimal settings file with meeting_intelligence overrides applied."""
     header = SETTINGS_HEADER

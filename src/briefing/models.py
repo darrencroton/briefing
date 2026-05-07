@@ -120,7 +120,6 @@ class RecordingConfig:
     record: bool | None = None
     location_type: str | None = None
     mode: str | None = None
-    audio_strategy: str | None = None
     host_name: str | None = None
     attendees_expected: int | None = None
     participant_names: list[str] = field(default_factory=list)

@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "session_id": "2026-04-24T140000+1000-customer-sync",
   "created_at": "2026-04-24T13:40:00+10:00",
   "meeting": {
@@ -12,8 +12,7 @@
     "location": "https://meet.example.invalid/acme-sync"
   },
   "mode": {
-    "type": "online",
-    "audio_strategy": "mic_plus_system"
+    "type": "online"
   },
   "participants": {
     "host_name": "Jamie Rivera",

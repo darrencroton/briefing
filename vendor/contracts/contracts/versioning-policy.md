@@ -10,17 +10,17 @@ Three kinds of version move together on each tag:
 2. **Schema files** — JSON Schemas live at `schemas/<name>.v<major>.json`. The `<major>` is encoded in the filename so that a v2 schema can sit alongside v1 during a transition. Each schema file enforces its **major** version only, via a `schema_version` pattern of `^<major>\.[0-9]+$`. It does **not** pin an exact minor; that would make the schemas themselves reject forward-tolerant payloads, which is the opposite of the compatibility rule below.
 3. **Payload `schema_version` field** — every manifest and completion payload carries `schema_version: "<major>.<minor>"`. The exact minor travels with the payload and with the repo tag at the time that payload's writer was built. Readers use the major to decide compatibility and the minor (plus the repo tag's `CHANGELOG.md` entry) to reason about which optional fields and enum additions to expect.
 
-## Compatibility rule (§8.4)
+## Compatibility Rule (§8.4)
 
 - **Major match required.** A consumer pinned to schema major N accepts only payloads with the same major N.
-- **Forward-tolerate minor.** A v1.0 reader accepts a v1.1 payload: unknown fields are ignored.
-- **Backward-strict minor.** A v1.1 reader does **not** accept a v1.0 payload that is missing a v1.1-required field; validation fails.
+- **Forward-tolerate minor.** A reader accepts a newer minor payload within the same major: unknown fields are ignored.
+- **Backward-strict minor.** A reader may reject an older minor payload in the same major if that payload is missing a required field introduced later in the major line.
 - **Unknown major → fail.** `noted validate-manifest` returns exit 2.
 
 ### How the schemas enforce this
 
-- `schema_version` in `schemas/manifest.v1.json` and `schemas/completion.v1.json` is a pattern matching `^1\.[0-9]+$` — **not** a const of `"1.0"`. Any 1.x payload therefore passes the major check; minor drift is handled by JSON Schema's default `additionalProperties: true`, which ignores unknown fields.
-- Enums (stop reasons, terminal statuses, mode types, audio strategies, ASR backends, runtime statuses, runtime phases) are closed in the schemas. Adding a value to any of them is breaking, and therefore a major bump. A reader cannot simultaneously be strict about unknown enum values and forward-tolerant about them; the contract chooses strictness, which is why enum additions are major.
+- `schema_version` in each schema is a pattern matching `^<major>\.[0-9]+$` — **not** a const of an exact minor. Any payload in that schema's major line therefore passes the major check; minor drift is handled by JSON Schema's default `additionalProperties: true`, which ignores unknown fields.
+- Enums (stop reasons, terminal statuses, mode types, ASR backends, runtime statuses, runtime phases) are closed in the schemas. Adding a value to any of them is breaking, and therefore a major bump. A reader cannot simultaneously be strict about unknown enum values and forward-tolerant about them; the contract chooses strictness, which is why enum additions are major.
 
 ## When to bump
 
@@ -53,29 +53,29 @@ Examples:
 Not examples (these are **major**, see below):
 
 - Adding a new **required** field.
-- Adding a value to any locked vocabulary (stop reasons, terminal statuses, runtime statuses, runtime phases, mode types, audio strategies, ASR backends, transcript filenames). Enums in the schemas are closed, and readers reject unknown values by design (`contracts/vocabulary.md`). An added value is therefore breaking for any older reader that receives it.
+- Adding a value to any locked vocabulary (stop reasons, terminal statuses, runtime statuses, runtime phases, mode types, ASR backends, transcript filenames). Enums in the schemas are closed, and readers reject unknown values by design (`contracts/vocabulary.md`). An added value is therefore breaking for any older reader that receives it.
 - Changing the meaning or type of an existing field.
 - Removing or renaming any field, enum value, CLI command, exit code, or filename.
 - Tightening a regex, enum, or range that previously accepted a value.
 
 On a minor bump:
 
-- **Do not edit the `schema_version` pattern in the schema files.** `schemas/manifest.v1.json` and `schemas/completion.v1.json` already accept any `1.x` via `^1\.[0-9]+$`; no change is required to admit a new minor. (If a producer needs a stricter floor — e.g. "my consumer requires at least 1.1" — enforce that in consumer code, not in the shared schema.)
+- **Do not edit the `schema_version` pattern in the schema files for a minor bump.** Each schema already accepts any payload in its major line via `^<major>\.[0-9]+$`; no change is required to admit a new minor. If a producer needs a stricter floor, enforce that in consumer code, not in the shared schema.
 - Add the new optional fields themselves to the relevant schemas.
 - Update any descriptive references to the minor (e.g. master-plan section headings, `CHANGELOG.md` language).
 - New producers emit `schema_version: "1.1"` in their payloads; older 1.0 producers keep emitting `"1.0"` and remain valid.
 - Write a `CHANGELOG.md` entry listing the added fields.
-- Release as `v1.1.0` on the root repo.
+- Release as the next minor tag on the root repo.
 
 The repo tag and the payload `schema_version` carry the exact minor. The v1 schema files enforce only the major.
 
 ### Major (1.x → 2.0)
 
-Breaking changes. This includes any of the "not examples" above — notably, any change to a locked vocabulary (added stop reasons, terminal statuses, runtime statuses, runtime phases, mode types, audio strategies, ASR backends, transcript filenames).
+Breaking changes. This includes any of the "not examples" above — notably, any change to a locked vocabulary (added stop reasons, terminal statuses, runtime statuses, runtime phases, mode types, ASR backends, transcript filenames).
 
 Rules:
 
-- Create new schema files at `schemas/<name>.v2.json`. The v1 files remain in the repo until both consumers have migrated.
+- Create new schema files at `schemas/<name>.v2.json`. Once both consumers have migrated, superseded active schema files may be moved to the project `archive/`.
 - Update `cli-contract.md`, `session-directory.md`, and `vocabulary.md` to reflect v2 shape; keep v1 notes visible where a behaviour diverges.
 - Release as `v2.0.0` on the root repo after both `briefing` and `noted` have opened draft implementations against v2 on branches.
 - Consumers migrate by bumping the contracts pin and updating payload emission in lockstep.

@@ -315,6 +315,22 @@ Use `record: false` under the marker to skip recording for one otherwise matched
 
 Use `location_type` under the marker to move one occurrence to a different Mac. For example, if the series normally records in the office but this instance is from home, set `location_type: home` in the calendar notes.
 
+`mode` controls the capture layout:
+
+| Mode | Audio files |
+|------|-------------|
+| `in_person` | `audio/raw_room.wav` |
+| `online` | `audio/raw_mic.wav`, `audio/raw_system.wav` |
+| `hybrid` | `audio/raw_mic.wav`, `audio/raw_system.wav` |
+
+For a Zoom meeting shifted from office to home, override both fields when needed:
+
+```text
+noted config:
+location_type: home
+mode: online
+```
+
 ## Planning and watch commands
 
 Write one manifest by event id:

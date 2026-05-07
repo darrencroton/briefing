@@ -174,7 +174,6 @@ _DEFAULT_LLM_COMMANDS = {
     "opencode": "opencode",
 }
 _VALID_MODE_TYPES = ("in_person", "online", "hybrid")
-_VALID_AUDIO_STRATEGIES = ("room_mic", "mic_plus_system")
 _VALID_ASR_BACKENDS = ("whisperkit", "fluidaudio-parakeet", "sfspeech")
 
 
@@ -474,13 +473,16 @@ def _parse_recording_config(raw: Any) -> RecordingConfig:
 
     mode_raw = raw.get("mode")
     mode_type: str | None = None
-    audio_strategy: str | None = None
+    if raw.get("audio_strategy") is not None:
+        raise SettingsError("Invalid series config: recording.audio_strategy has been removed; set recording.mode instead.")
     if isinstance(mode_raw, dict):
+        if mode_raw.get("audio_strategy") is not None:
+            raise SettingsError(
+                "Invalid series config: recording.mode.audio_strategy has been removed; set recording.mode.type instead."
+            )
         mode_type = _optional_str(mode_raw.get("type"))
-        audio_strategy = _optional_str(mode_raw.get("audio_strategy"))
     else:
         mode_type = _optional_str(mode_raw)
-        audio_strategy = _optional_str(raw.get("audio_strategy"))
 
     policy_raw = raw.get("recording_policy") or raw.get("policy") or {}
     if not isinstance(policy_raw, dict):
@@ -490,7 +492,6 @@ def _parse_recording_config(raw: Any) -> RecordingConfig:
         record=_optional_bool(raw.get("record")),
         location_type=normalize_location_type(_optional_str(raw.get("location_type"))),
         mode=mode_type,
-        audio_strategy=audio_strategy,
         host_name=_optional_str(participants.get("host_name", raw.get("host_name"))),
         attendees_expected=_optional_int(participants.get("attendees_expected", raw.get("attendees_expected"))),
         participant_names=[str(item) for item in participants.get("participant_names", raw.get("participant_names", []))],

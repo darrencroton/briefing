@@ -67,11 +67,10 @@ _SCHEMA_PATH = (
     / "contracts"
     / "contracts"
     / "schemas"
-    / "manifest.v1.json"
+    / "manifest.v2.json"
 )
 _VALIDATOR: Draft202012Validator | None = None
 _VALID_MODES = {"in_person", "online", "hybrid"}
-_VALID_AUDIO_STRATEGIES = {"room_mic", "mic_plus_system"}
 _VALID_ASR_BACKENDS = {"whisperkit", "fluidaudio-parakeet", "sfspeech"}
 _ACTIVE_UNLAUNCHED_STATUSES = {"planned", "launch_blocked"}
 _REPLAN_BLOCKING_STATUSES = {"invalidated", "launched", "launch_failed"}
@@ -152,7 +151,6 @@ def merge_recording_config(base: RecordingConfig, override: RecordingConfig | No
         record=_choose(override.record, base.record),
         location_type=_choose(override.location_type, base.location_type),
         mode=_choose(override.mode, base.mode),
-        audio_strategy=_choose(override.audio_strategy, base.audio_strategy),
         host_name=_choose(override.host_name, base.host_name),
         attendees_expected=_choose(override.attendees_expected, base.attendees_expected),
         participant_names=override.participant_names or list(base.participant_names),
@@ -354,7 +352,7 @@ def assemble_manifest(
     next_event: MeetingEvent | None = None,
     next_manifest_path: str | None = None,
 ) -> dict[str, Any]:
-    """Assemble the manifest.v1 payload for one eligible event."""
+    """Assemble the manifest.v2 payload for one eligible event."""
     event = eligibility.event
     recording = eligibility.recording or RecordingConfig()
     _reject_naive(event.start, "event.start")
@@ -386,7 +384,7 @@ def assemble_manifest(
         meeting["location_type"] = target_location_type
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "session_id": session_id,
         "created_at": created_at.isoformat(),
         "meeting": meeting,
@@ -675,16 +673,7 @@ def _mode(settings: AppSettings, recording: RecordingConfig) -> dict[str, str]:
     mode_type = recording.mode or settings.meeting_intelligence.default_mode
     if mode_type not in _VALID_MODES:
         raise PlanningError(f"Unsupported recording mode: {mode_type}")
-    audio_strategy = recording.audio_strategy or _default_audio_strategy(mode_type)
-    if audio_strategy not in _VALID_AUDIO_STRATEGIES:
-        raise PlanningError(f"Unsupported audio strategy: {audio_strategy}")
-    return {"type": mode_type, "audio_strategy": audio_strategy}
-
-
-def _default_audio_strategy(mode_type: str) -> str:
-    if mode_type == "online":
-        return "mic_plus_system"
-    return "room_mic"
+    return {"type": mode_type}
 
 
 def _recording_policy(settings: AppSettings, recording: RecordingConfig) -> dict[str, int | bool]:

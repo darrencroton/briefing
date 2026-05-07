@@ -46,7 +46,7 @@ class SessionIdentityMismatch(SessionLoadError):
     exit_code = 4
 
 
-_MAJOR_ONE = re.compile(r"^1\.[0-9]+$")
+_MANIFEST_MAJOR = re.compile(r"^2\.[0-9]+$")
 
 _SCHEMA_PATH = (
     Path(__file__).resolve().parents[3]
@@ -54,7 +54,7 @@ _SCHEMA_PATH = (
     / "contracts"
     / "contracts"
     / "schemas"
-    / "manifest.v1.json"
+    / "manifest.v2.json"
 )
 
 _VALIDATOR: Draft202012Validator | None = None
@@ -138,9 +138,9 @@ def load_manifest(session_dir: Path) -> Manifest:
         raise ManifestInvalid(f"Manifest must be a JSON object: {path}")
 
     version = payload.get("schema_version")
-    if not isinstance(version, str) or not _MAJOR_ONE.match(version):
+    if not isinstance(version, str) or not _MANIFEST_MAJOR.match(version):
         raise ManifestUnsupportedVersion(
-            f"Unsupported manifest schema_version {version!r}; reader accepts 1.x only."
+            f"Unsupported manifest schema_version {version!r}; reader accepts 2.x only."
         )
 
     errors = sorted(

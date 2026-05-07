@@ -17,7 +17,8 @@ from .sources.notion_source import NotionClient
 from .sources.slack_source import SlackClient
 from .utils import expand_path
 
-_MAJOR_ONE = re.compile(r"^1\.[0-9]+$")
+_MANIFEST_MAJOR = re.compile(r"^2\.[0-9]+$")
+_COMPLETION_MAJOR = re.compile(r"^1\.[0-9]+$")
 
 
 def validate_environment(settings: AppSettings, series_configs) -> list[ValidationMessage]:
@@ -274,7 +275,7 @@ def _check_noted_version(noted_command: str, messages: list[ValidationMessage]) 
     raw_completion_v = payload.get("completion_schema_version")
     manifest_v = str(raw_manifest_v) if raw_manifest_v is not None else None
     completion_v = str(raw_completion_v) if raw_completion_v is not None else None
-    if manifest_v and _MAJOR_ONE.match(manifest_v) and completion_v and _MAJOR_ONE.match(completion_v):
+    if manifest_v and _MANIFEST_MAJOR.match(manifest_v) and completion_v and _COMPLETION_MAJOR.match(completion_v):
         messages.append(
             ValidationMessage(
                 "info",
@@ -292,7 +293,15 @@ def _check_noted_version(noted_command: str, messages: list[ValidationMessage]) 
                         f"noted {label}_schema_version absent from `noted version` output",
                     )
                 )
-            elif not _MAJOR_ONE.match(version):
+            elif label == "manifest" and not _MANIFEST_MAJOR.match(version):
+                messages.append(
+                    ValidationMessage(
+                        "error",
+                        "noted_schema_compat_error",
+                        f"noted {label}_schema_version {version!r} is not compatible with briefing (expects 2.x)",
+                    )
+                )
+            elif label == "completion" and not _COMPLETION_MAJOR.match(version):
                 messages.append(
                     ValidationMessage(
                         "error",

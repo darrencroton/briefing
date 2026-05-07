@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "session_id": "2026-04-24T093000+1000-weekly-product-review",
-  "manifest_schema_version": "1.0",
+  "manifest_schema_version": "2.0",
   "terminal_status": "completed",
   "stop_reason": "scheduled_stop",
   "audio_capture_ok": true,

@@ -11,8 +11,7 @@
     "location": "Conference Room 3B"
   },
   "mode": {
-    "type": "in_person",
-    "audio_strategy": "room_mic"
+    "type": "in_person"
   },
   "participants": {
     "host_name": "Alex Chen",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://briefing-noted-contracts/schemas/manifest.v1.json",
+  "$id": "https://briefing-noted-contracts/schemas/manifest.v2.json",
   "title": "Session Manifest",
   "description": "Manifest handoff from briefing (or noted, for ad hoc) to noted for one meeting instance. Authoritative shape is the master plan §8. Once written, a manifest must not be modified; runtime state lives in separate files.",
   "type": "object",
@@ -19,9 +19,9 @@
   "additionalProperties": true,
   "properties": {
     "schema_version": {
-      "description": "Major.minor version of this manifest payload. Readers pinned to major 1 accept any 1.x payload; forward-tolerate minor (unknown fields ignored). Enforced as a major-1 pattern rather than a const so a 1.0 reader does not reject a 1.1 payload at schema-validation time (see `contracts/versioning-policy.md`).",
+      "description": "Major.minor version of this manifest payload. Readers pinned to major 2 accept any 2.x payload; forward-tolerate minor (unknown fields ignored). Enforced as a major-2 pattern rather than a const so a 2.0 reader does not reject a 2.1 payload at schema-validation time (see `contracts/versioning-policy.md`).",
       "type": "string",
-      "pattern": "^1\\.[0-9]+$"
+      "pattern": "^2\\.[0-9]+$"
     },
     "session_id": {
       "description": "Unique session identifier. Used as the session directory name.",
@@ -77,13 +77,13 @@
       "type": "object",
       "required": ["type"],
       "additionalProperties": true,
+      "not": {
+        "required": ["audio_strategy"]
+      },
       "properties": {
         "type": {
+          "description": "Meeting capture mode. in_person captures the room microphone only. online and hybrid capture local microphone plus system audio.",
           "enum": ["in_person", "online", "hybrid"]
-        },
-        "audio_strategy": {
-          "description": "Capture strategy. If absent, noted derives it from mode.type per §14.1.",
-          "enum": ["room_mic", "mic_plus_system"]
         }
       }
     },

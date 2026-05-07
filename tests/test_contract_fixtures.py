@@ -15,12 +15,12 @@ def test_contracts_snapshot_is_pinned_to_expected_tag() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     tag = (repo_root / "vendor" / "contracts" / "CONTRACTS_TAG").read_text().strip()
 
-    assert tag == "v1.0.2"
+    assert tag == "v2.0.0"
 
 
 def test_shared_contract_fixtures_validate_against_schemas() -> None:
     contracts_dir = _contracts_dir()
-    manifest_schema = json.loads((contracts_dir / "schemas" / "manifest.v1.json").read_text())
+    manifest_schema = json.loads((contracts_dir / "schemas" / "manifest.v2.json").read_text())
     completion_schema = json.loads((contracts_dir / "schemas" / "completion.v1.json").read_text())
 
     manifest_validator = Draft202012Validator(manifest_schema, format_checker=FormatChecker())
@@ -51,7 +51,7 @@ def test_shared_contract_fixtures_validate_against_schemas() -> None:
 
 def test_manifest_schema_rejects_malformed_offset_timestamp() -> None:
     contracts_dir = _contracts_dir()
-    manifest_schema = json.loads((contracts_dir / "schemas" / "manifest.v1.json").read_text())
+    manifest_schema = json.loads((contracts_dir / "schemas" / "manifest.v2.json").read_text())
     validator = Draft202012Validator(manifest_schema, format_checker=FormatChecker())
     fixture = json.loads((contracts_dir / "fixtures" / "manifests" / "valid-inperson.json").read_text())
 
@@ -59,6 +59,18 @@ def test_manifest_schema_rejects_malformed_offset_timestamp() -> None:
 
     errors = list(validator.iter_errors(fixture))
     assert any(error.validator == "format" and list(error.path) == ["created_at"] for error in errors)
+
+
+def test_manifest_schema_rejects_removed_audio_strategy() -> None:
+    contracts_dir = _contracts_dir()
+    manifest_schema = json.loads((contracts_dir / "schemas" / "manifest.v2.json").read_text())
+    validator = Draft202012Validator(manifest_schema, format_checker=FormatChecker())
+    fixture = json.loads((contracts_dir / "fixtures" / "manifests" / "valid-inperson.json").read_text())
+
+    fixture["mode"]["audio_strategy"] = "room_mic"
+
+    errors = list(validator.iter_errors(fixture))
+    assert any(list(error.path) == ["mode"] and error.validator == "not" for error in errors)
 
 
 def test_completion_fixtures_preserve_ingest_decision_contract() -> None:

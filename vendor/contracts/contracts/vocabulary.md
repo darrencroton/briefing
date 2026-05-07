@@ -59,11 +59,6 @@ Finer-grained indicator within `recording`, `stopping`, or `processing` (§10.2)
 - `online`
 - `hybrid`
 
-## Audio strategies (in manifest)
-
-- `room_mic`
-- `mic_plus_system`
-
 ## ASR backends (in manifest)
 
 Locked for v1 per §15.2 and §27.9. Python backends (`faster-whisper`, `whisperx`) are **not** part of `noted` and are not valid values.

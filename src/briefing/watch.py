@@ -365,6 +365,6 @@ def _manifest_schema_version(plan: SessionPlanState) -> str:
     try:
         manifest = json.loads(Path(plan.manifest_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return "1.0"
+        return "2.0"
     version = manifest.get("schema_version") if isinstance(manifest, dict) else None
-    return str(version) if version is not None else "1.0"
+    return str(version) if version is not None else "2.0"

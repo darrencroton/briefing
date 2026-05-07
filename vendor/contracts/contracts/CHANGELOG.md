@@ -1,8 +1,16 @@
 # Changelog
 
-All notable changes to the `briefing` ↔ `noted` contracts are recorded here. Versions follow semver on the `briefing-noted-contracts` root repository. The v1 schema files enforce only the major (`^1\.[0-9]+$` on `schema_version`); the exact minor lives in the repo tag and in each payload's `schema_version` field. See `versioning-policy.md`.
+All notable changes to the `briefing` ↔ `noted` contracts are recorded here. Versions follow semver on the `briefing-noted-contracts` root repository. Schema files enforce only their major version (`^<major>\.[0-9]+$` on `schema_version`); the exact minor lives in the repo tag and in each payload's `schema_version` field. See `versioning-policy.md`.
 
 Rules for bumps and the change-proposal process live in `versioning-policy.md`.
+
+## [2.0.0] — 2026-05-07
+
+### Changed
+
+- Removed manifest `mode.audio_strategy`. Capture files are now derived directly from `mode.type`.
+- `in_person` writes `audio/raw_room.wav`; `online` and `hybrid` both write `audio/raw_mic.wav` and `audio/raw_system.wav`.
+- Removed the `audio_strategy` vocabulary. `mode.type` is the only user-facing capture mode selector.
 
 ## [1.0.2] — 2026-04-30
 
@@ -62,7 +70,7 @@ Phase 1 (Lock Contracts) of the Master Implementation Plan. First tagged release
 - `schemas/completion.v1.json` — JSON Schema for `completion.json` (§11.3). Required: `schema_version`, `session_id`, `manifest_schema_version`, `terminal_status`, `stop_reason`, all three `*_ok` booleans, `warnings`, `errors`, `completed_at`. `schema_version` uses the same major-1 pattern as the manifest.
 - `schemas/runtime-status.v1.json` — JSON Schema for `runtime/status.json` (§10.3). No `schema_version` field; the filename carries the version, matching the master-plan example.
 - `cli-contract.md` — `noted` CLI surface from §9: `start`, `stop`, `extend`, `switch-next`, `status`, `validate-manifest`, `version`; optional `wait`; exit codes; JSON stdout shapes.
-- `session-directory.md` — canonical layout, file-requirements table, transcript filenames, audio files by **`audio_strategy`** (not by `mode.type`, resolving the master-plan §11.1 vs §14.1 inconsistency — master plan §11.1 updated to match), and the stop-reason → terminal-status mapping. Raw-audio retention is explicitly out of scope for v1.0 and deferred to §27.10 / Phase 5.
+- `session-directory.md` — canonical layout, file-requirements table, transcript filenames, audio file layout, and the stop-reason → terminal-status mapping. Raw-audio retention is explicitly out of scope for v1.0 and deferred to §27.10 / Phase 5.
 - `vocabulary.md` — locked vocabulary from §26: stop reasons, terminal statuses, runtime statuses, runtime phases, mode types, audio strategies, ASR backends, transcript filenames, timezone rule. Any change to any list is a major bump (readers reject unknowns by design).
 - `versioning-policy.md` — compatibility rule (§8.4), bump classification (patch / minor / major), change-proposal process, authorisation. Enum additions are classified as major, consistent with closed-enum readers; schema-level enforcement of the compatibility rule is described explicitly.
 - `README.md` — purpose, consumption (git submodule pinned to tag; tarball-at-tag alternative), change-proposal summary, non-negotiables. Explicit statement that the JSON Schemas are executable contracts, not documentation.
@@ -91,3 +99,4 @@ Open items whose resolution is not yet reflected here because they do not affect
 [1.0.0]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.0
 [1.0.1]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.1
 [1.0.2]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v1.0.2
+[2.0.0]: https://github.com/darrencroton/briefing-noted-contracts/releases/tag/v2.0.0
