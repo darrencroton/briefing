@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
+import requests
 
 from briefing.llm import (
     ClaudeCLIProvider,
@@ -12,7 +13,7 @@ from briefing.llm import (
     CopilotCLIProvider,
     GeminiCLIProvider,
     LLMError,
-    OpenCodeCLIProvider,
+    OpenAICompatibleAPIProvider,
 )
 
 
@@ -23,6 +24,47 @@ def cli_on_path(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda command: f"/usr/bin/{command}",
     )
 
+
+# ---------------------------------------------------------------------------
+# Fake helpers for OpenAI-compatible API tests
+# ---------------------------------------------------------------------------
+
+class FakeModelsResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, object]:
+        return self.payload
+
+
+class FakeOpenAIClient:
+    def __init__(self, **kwargs: object) -> None:
+        self.kwargs = kwargs
+        self.chat = FakeChat()
+
+
+class FakeChat:
+    def __init__(self) -> None:
+        self.completions = FakeCompletions()
+
+
+class FakeCompletions:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        message = type("Message", (), {"content": "model output"})
+        choice = type("Choice", (), {"message": message, "finish_reason": "stop"})
+        return type("Response", (), {"choices": [choice]})()
+
+
+# ---------------------------------------------------------------------------
+# Claude CLI provider
+# ---------------------------------------------------------------------------
 
 def test_claude_validate_requires_login(
     monkeypatch: pytest.MonkeyPatch,
@@ -88,6 +130,10 @@ def test_claude_builds_command_with_effort(cli_on_path: None, app_settings) -> N
     ]
 
 
+# ---------------------------------------------------------------------------
+# Codex CLI provider
+# ---------------------------------------------------------------------------
+
 def test_codex_validate_requires_login(
     monkeypatch: pytest.MonkeyPatch,
     cli_on_path: None,
@@ -152,6 +198,10 @@ def test_codex_generate_reads_output_file(
     assert "-o" in captured["command"]
 
 
+# ---------------------------------------------------------------------------
+# Gemini CLI provider
+# ---------------------------------------------------------------------------
+
 def test_gemini_validate_accepts_api_key(
     monkeypatch: pytest.MonkeyPatch,
     cli_on_path: None,
@@ -206,6 +256,10 @@ def test_gemini_requires_supported_automation_credentials(
     assert ok is False
     assert "GEMINI_API_KEY" in message
 
+
+# ---------------------------------------------------------------------------
+# Copilot CLI provider
+# ---------------------------------------------------------------------------
 
 def test_copilot_validate_accepts_token_env_var(
     cli_on_path: None,
@@ -298,276 +352,223 @@ def test_copilot_validate_rejects_generic_github_auth_without_copilot_access(
     assert "Copilot CLI access" in message
 
 
-def test_opencode_validate_accepts_working_binary(
-    cli_on_path: None,
+# ---------------------------------------------------------------------------
+# OpenAI-compatible API provider
+# ---------------------------------------------------------------------------
+
+def _make_api_provider(
+    app_settings,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    base_url: str = "http://127.0.0.1:1234/v1",
+    model: str = "local-model",
+    api_key_env: str = "",
+) -> tuple[OpenAICompatibleAPIProvider, list[FakeOpenAIClient]]:
+    clients: list[FakeOpenAIClient] = []
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = base_url
+    app_settings.llm.model = model
+    app_settings.llm.api_key_env = api_key_env
+    return OpenAICompatibleAPIProvider(app_settings), clients
+
+
+def test_openai_compatible_validate_returns_true_when_endpoint_reachable(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "ollama/llama2"
+    provider, _ = _make_api_provider(app_settings, monkeypatch, model="local-model")
+    monkeypatch.setattr(
+        "briefing.llm.requests.get",
+        lambda *args, **kwargs: FakeModelsResponse({"data": [{"id": "local-model"}]}),
+    )
 
-    provider = OpenCodeCLIProvider(app_settings)
-
-    def fake_readiness(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
-        if command == ["opencode", "--version"]:
-            return subprocess.CompletedProcess(command, 0, stdout="opencode 1.14.35\n", stderr="")
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout='{"type":"text","part":{"text":"OK"}}\n',
-            stderr="",
-        )
-
-    provider._run_readiness_check = fake_readiness  # type: ignore[method-assign]
     ok, message = provider.validate()
 
     assert ok is True
-    assert "opencode" in message
+    assert "openai-compatible" in message
+    assert "127.0.0.1:1234" in message
 
 
-def test_opencode_validate_requires_model(
-    cli_on_path: None,
+def test_openai_compatible_validate_fails_when_endpoint_unreachable(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = ""
+    provider, _ = _make_api_provider(app_settings, monkeypatch)
 
-    provider = OpenCodeCLIProvider(app_settings)
+    def fail_get(*args, **kwargs):
+        raise requests.ConnectionError("Connection refused")
+
+    monkeypatch.setattr("briefing.llm.requests.get", fail_get)
+
     ok, message = provider.validate()
 
     assert ok is False
-    assert "provider/model" in message
+    assert "not reachable" in message
 
 
-def test_opencode_validate_requires_provider_model_format(
-    cli_on_path: None,
+def test_openai_compatible_validate_strips_trailing_slash_and_forms_correct_url(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "llama2"
-
-    provider = OpenCodeCLIProvider(app_settings)
-    ok, message = provider.validate()
-
-    assert ok is False
-    assert "provider/model" in message
-
-
-def test_opencode_validate_returns_error_on_failure(
-    cli_on_path: None,
-    app_settings,
-) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "ollama/llama2"
-
-    provider = OpenCodeCLIProvider(app_settings)
-    provider._run_readiness_check = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "--version"],
-        1,
-        stdout="",
-        stderr="opencode: command not found",
+    monkeypatch.setenv("LOCAL_LLM_KEY", "test-key")
+    # base_url has a trailing slash — _setup() must strip it
+    provider, _ = _make_api_provider(
+        app_settings, monkeypatch,
+        base_url="http://127.0.0.1:1234/v1/",
+        api_key_env="LOCAL_LLM_KEY",
     )
-    ok, message = provider.validate()
+    captured: dict[str, object] = {}
 
-    assert ok is False
-    assert "opencode --version" in message
+    def fake_get(url: str, headers: dict, timeout: float) -> FakeModelsResponse:
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["timeout"] = timeout
+        return FakeModelsResponse({"data": [{"id": "local-model"}]})
+
+    monkeypatch.setattr("briefing.llm.requests.get", fake_get)
+
+    provider.validate()
+
+    assert captured == {
+        "url": "http://127.0.0.1:1234/v1/models",
+        "headers": {"Authorization": "Bearer test-key"},
+        "timeout": 15.0,
+    }
 
 
-def test_opencode_validate_rejects_json_error_event(
-    cli_on_path: None,
+def test_openai_compatible_generate_sends_correct_request(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    import json as _json
+    app_settings.llm.temperature = 0.15
+    app_settings.llm.max_output_tokens = 4096
+    provider, clients = _make_api_provider(app_settings, monkeypatch)
 
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "invalid/invalid"
+    response = provider.generate("the full prompt")
 
-    provider = OpenCodeCLIProvider(app_settings)
-
-    def fake_readiness(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
-        if command == ["opencode", "--version"]:
-            return subprocess.CompletedProcess(command, 0, stdout="opencode 1.14.35\n", stderr="")
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout=_json.dumps({
-                "type": "error",
-                "error": {"data": {"message": "Model not found: invalid/invalid."}},
-            }),
-            stderr="",
-        )
-
-    provider._run_readiness_check = fake_readiness  # type: ignore[method-assign]
-
-    ok, message = provider.validate()
-
-    assert ok is False
-    assert "Model not found: invalid/invalid" in message
-
-
-def test_opencode_builds_command_with_model_and_effort(
-    cli_on_path: None,
-    app_settings,
-) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "ollama/llama3.2"
-    app_settings.llm.effort = "medium"
-
-    provider = OpenCodeCLIProvider(app_settings)
-
-    assert provider._build_command("prompt") == [
-        "opencode",
-        "run",
-        "--format",
-        "json",
-        "--model",
-        "ollama/llama3.2",
-        "--variant",
-        "medium",
-        "prompt",
+    assert response.text == "model output"
+    assert clients[0].chat.completions.calls == [
+        {
+            "model": "local-model",
+            "messages": [{"role": "user", "content": "the full prompt"}],
+            "temperature": 0.15,
+            "max_tokens": 4096,
+        }
     ]
 
 
-def test_opencode_builds_command_without_effort(
-    cli_on_path: None,
+def test_openai_compatible_strips_auth_header_when_no_api_key_configured(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    app_settings.llm.model = "anthropic/claude-sonnet-4-6"
-    app_settings.llm.effort = ""
+    import httpx
 
-    provider = OpenCodeCLIProvider(app_settings)
+    captured_http_client: list[object] = []
 
-    assert provider._build_command("prompt") == [
-        "opencode",
-        "run",
-        "--format",
-        "json",
-        "--model",
-        "anthropic/claude-sonnet-4-6",
-        "prompt",
-    ]
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        captured_http_client.append(kwargs.get("http_client"))
+        return FakeOpenAIClient(**{k: v for k, v in kwargs.items() if k != "http_client"})
 
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
 
-def test_opencode_generate_parses_ndjson_text_events(
-    cli_on_path: None,
-    app_settings,
-) -> None:
-    import json as _json
+    OpenAICompatibleAPIProvider(app_settings)
 
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    provider = OpenCodeCLIProvider(app_settings)
-
-    ndjson_output = "\n".join([
-        _json.dumps({"type": "step_start", "timestamp": 1, "sessionID": "s1", "part": {"type": "step-start"}}),
-        _json.dumps({"type": "text", "timestamp": 2, "sessionID": "s1", "part": {"type": "text", "text": "Hello, "}}),
-        _json.dumps({"type": "text", "timestamp": 3, "sessionID": "s1", "part": {"type": "text", "text": "world!"}}),
-        _json.dumps({"type": "step_finish", "timestamp": 4, "sessionID": "s1", "part": {"type": "step-finish"}}),
-    ])
-    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "run"],
-        0,
-        stdout=ndjson_output,
-        stderr="",
+    http_client = captured_http_client[0]
+    assert isinstance(http_client, httpx.Client)
+    # Verify the event hook strips any Authorization header the SDK injects
+    fake_req = httpx.Request(
+        "POST", "http://127.0.0.1:1234/v1/chat/completions",
+        headers={"authorization": "Bearer not-needed", "content-type": "application/json"},
     )
+    for hook in http_client.event_hooks["request"]:
+        hook(fake_req)
+    assert "authorization" not in dict(fake_req.headers)
+    assert "content-type" in dict(fake_req.headers)
 
-    response = provider.generate("prompt body")
 
-    assert response.text == "Hello, world!"
-    assert response.raw == ndjson_output
-
-
-def test_opencode_generate_raises_on_empty_text_events(
-    cli_on_path: None,
+def test_openai_compatible_authenticated_client_uses_api_key_without_http_client_override(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
-    import json as _json
+    monkeypatch.setenv("MY_LLM_KEY", "real-api-key")
+    all_kwargs: list[dict[str, object]] = []
 
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    provider = OpenCodeCLIProvider(app_settings)
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        all_kwargs.append(dict(kwargs))
+        return FakeOpenAIClient(**{k: v for k, v in kwargs.items() if k != "http_client"})
 
-    ndjson_output = "\n".join([
-        _json.dumps({"type": "step_start", "timestamp": 1, "sessionID": "s1", "part": {}}),
-        _json.dumps({"type": "step_finish", "timestamp": 2, "sessionID": "s1", "part": {}}),
-    ])
-    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "run"],
-        0,
-        stdout=ndjson_output,
-        stderr="",
-    )
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = "MY_LLM_KEY"
+
+    OpenAICompatibleAPIProvider(app_settings)
+
+    assert all_kwargs[0]["api_key"] == "real-api-key"
+    assert "http_client" not in all_kwargs[0]
+
+
+def test_openai_compatible_generate_raises_on_empty_output(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+        message = type("Message", (), {"content": ""})
+        choice = type("Choice", (), {"message": message, "finish_reason": "stop"})
+        client.chat.completions.create = lambda **kw: type("Response", (), {"choices": [choice]})()
+        return client
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+
+    provider = OpenAICompatibleAPIProvider(app_settings)
 
     with pytest.raises(LLMError, match="empty output"):
-        provider.generate("prompt body")
-
-
-def test_opencode_generate_raises_on_json_error_event(
-    cli_on_path: None,
-    app_settings,
-) -> None:
-    import json as _json
-
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    provider = OpenCodeCLIProvider(app_settings)
-
-    ndjson_output = _json.dumps({
-        "type": "error",
-        "error": {
-            "name": "UnknownError",
-            "data": {"message": "Model not found: invalid/invalid."},
-        },
-    })
-    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "run"],
-        0,
-        stdout=ndjson_output,
-        stderr="",
-    )
-
-    with pytest.raises(LLMError, match="Model not found: invalid/invalid"):
-        provider.generate("prompt body")
-
-
-def test_opencode_generate_adds_connection_hint(
-    cli_on_path: None,
-    app_settings,
-) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    provider = OpenCodeCLIProvider(app_settings)
-    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "run"],
-        1,
-        stdout="",
-        stderr="connect: connection refused 127.0.0.1:11434",
-    )
-
-    with pytest.raises(LLMError, match=r"port 11434"):
         provider.generate("prompt")
 
 
-def test_opencode_generate_adds_api_key_hint(
-    cli_on_path: None,
+def test_openai_compatible_generate_warns_on_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
     app_settings,
 ) -> None:
-    app_settings.llm.provider = "opencode"
-    app_settings.llm.command = "opencode"
-    provider = OpenCodeCLIProvider(app_settings)
-    provider._run_subprocess = lambda *_args, **_kwargs: subprocess.CompletedProcess(  # type: ignore[method-assign]
-        ["opencode", "run"],
-        1,
-        stdout="",
-        stderr="Unauthorized: invalid API key",
-    )
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+        message = type("Message", (), {"content": "truncated"})
+        choice = type("Choice", (), {"message": message, "finish_reason": "length"})
+        client.chat.completions.create = lambda **kw: type("Response", (), {"choices": [choice]})()
+        return client
 
-    with pytest.raises(LLMError, match=r"API key"):
-        provider.generate("prompt")
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+    app_settings.llm.max_output_tokens = 512
+
+    provider = OpenAICompatibleAPIProvider(app_settings)
+
+    with caplog.at_level(logging.WARNING):
+        response = provider.generate("prompt")
+
+    assert response.text == "truncated"
+    assert any(
+        "finish_reason=length" in r.message and "512" in r.message
+        for r in caplog.records
+    )

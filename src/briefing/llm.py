@@ -1,4 +1,4 @@
-"""LLM provider abstraction for supported CLI tools."""
+"""LLM provider abstraction for supported CLI tools and OpenAI-compatible API servers."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import json
 import logging
 import os
 from pathlib import Path
+import requests
 import shutil
 import subprocess
-import sys
 import tempfile
 from dataclasses import dataclass
 
@@ -353,124 +353,130 @@ class CopilotCLIProvider(CLIProvider):
         )
 
 
-class OpenCodeCLIProvider(CLIProvider):
-    """OpenCode provider for local LLMs and cloud APIs."""
+class OpenAICompatibleAPIProvider:
+    """OpenAI-compatible chat completions provider for local and self-hosted LLM servers.
 
-    cli_command = "opencode"
-    extra_flags = ("run", "--format", "json")
-    model_flag = "--model"
-    effort_flag = "--variant"
+    Works with LM Studio, llama.cpp, vLLM, LocalAI, or any service that exposes
+    a /v1/chat/completions endpoint. Configure base_url and model in [llm]; set
+    api_key_env to the environment variable holding the key for authenticated endpoints.
+    """
 
-    def _validate_runtime_ready(self) -> str | None:
+    _READINESS_TIMEOUT_SECONDS = 15
+
+    def __init__(self, settings: AppSettings):
+        self.settings = settings
+        self._setup()
+
+    def _setup(self) -> None:
+        import httpx
+        import openai
+
+        self.base_url = (self.settings.llm.base_url or "").strip().rstrip("/")
+        if not self.base_url:
+            raise LLMError(
+                "OpenAI-compatible provider requires [llm].base_url, "
+                'for example "http://127.0.0.1:1234/v1" for LM Studio.'
+            )
         if not self.settings.llm.model:
-            return (
-                "OpenCode requires [llm].model for predictable automation. "
-                "Set it to provider/model format, e.g. ollama/llama2 or openai/gpt-5.2."
+            raise LLMError("OpenAI-compatible provider requires [llm].model.")
+
+        api_key_env = (self.settings.llm.api_key_env or "").strip()
+        self.api_key = os.getenv(api_key_env) if api_key_env else ""
+
+        if self.api_key:
+            self.client = openai.OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=float(self.settings.llm.timeout_seconds),
             )
-        if "/" not in self.settings.llm.model:
-            return (
-                "OpenCode [llm].model must use provider/model format, "
-                f"got {self.settings.llm.model!r}."
+        else:
+            # No API key — strip the Authorization header the SDK injects so
+            # unauthenticated servers don't receive an unexpected Bearer token.
+            def _strip_auth(request: httpx.Request) -> None:
+                request.headers.pop("authorization", None)
+
+            self.client = openai.OpenAI(
+                api_key="not-needed",
+                base_url=self.base_url,
+                timeout=float(self.settings.llm.timeout_seconds),
+                http_client=httpx.Client(event_hooks={"request": [_strip_auth]}),
             )
 
-        result = self._run_readiness_check([self.command, "--version"])
-        if result.returncode != 0:
-            return (
-                "OpenCode is installed but could not be verified. "
-                "Run `opencode --version` to diagnose the issue."
-            )
-
-        command = self._build_command("Reply with exactly OK.")
-        result = self._run_readiness_check(command)
-        if result.returncode != 0:
-            return (
-                "OpenCode CLI is installed but did not complete a non-interactive readiness check. "
-                f"{self._format_command_failure(result)}"
-            )
+    def validate(self) -> tuple[bool, str]:
+        """Check whether the configured endpoint is reachable."""
         try:
-            self._parse_output(result)
+            self._validate_runtime_ready()
         except LLMError as exc:
-            error_output = self._error_output(result)
-            hint = self._error_hint(error_output)
-            hint_text = f" {hint}" if hint else ""
-            return (
-                "OpenCode CLI is installed but did not complete a non-interactive readiness check. "
-                f"{exc}{hint_text}"
-            )
-        return None
+            return False, str(exc)
+        return True, f"Validated API provider 'openai-compatible' at {self.base_url}."
 
-    def _error_hint(self, error_output: str) -> str | None:
-        lowered = error_output.lower()
-        if "unauthorized" in lowered or "api key" in lowered or "authentication" in lowered:
-            return (
-                "Set the appropriate API key environment variable for your provider "
-                "(for example ANTHROPIC_API_KEY or OPENAI_API_KEY) before using `briefing`."
-            )
-        if "connection refused" in lowered or "econnrefused" in lowered or "connect:" in lowered:
-            return (
-                "Ensure your local LLM server is running: "
-                "Ollama on port 11434 or LM Studio on port 1234."
-            )
-        return None
+    def _validate_runtime_ready(self) -> None:
+        timeout = min(float(self.settings.llm.timeout_seconds), self._READINESS_TIMEOUT_SECONDS)
+        headers: dict[str, str] = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        try:
+            response = requests.get(f"{self.base_url}/models", headers=headers, timeout=timeout)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise LLMError(
+                f"OpenAI-compatible endpoint is not reachable at {self.base_url}: {exc}"
+            ) from exc
 
-    def _parse_output(self, completed: subprocess.CompletedProcess[str]) -> str:
-        parts: list[str] = []
-        errors: list[str] = []
-        for line in completed.stdout.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") == "error":
-                errors.append(self._format_event_error(event))
-                continue
-            if event.get("type") == "text":
-                text = event.get("part", {}).get("text", "")
-                if text:
-                    parts.append(text)
-        if errors:
-            message = "; ".join(errors)
-            hint = self._error_hint(message)
-            hint_text = f" {hint}" if hint else ""
-            raise LLMError(f"opencode returned error: {message}{hint_text}")
-        text = "".join(parts).strip()
+        model_ids = _extract_model_ids(response)
+        if model_ids and self.settings.llm.model not in model_ids:
+            LOGGER.warning(
+                "Configured model %r was not listed by %s/models. Available: %s",
+                self.settings.llm.model,
+                self.base_url,
+                ", ".join(sorted(model_ids)),
+            )
+
+    def generate(self, prompt: str) -> LLMResponse:
+        """Generate text from a prompt via the chat completions endpoint."""
+        response = self.client.chat.completions.create(
+            model=self.settings.llm.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=self.settings.llm.temperature,
+            max_tokens=self.settings.llm.max_output_tokens,
+        )
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            LOGGER.warning(
+                "OpenAI-compatible API hit the token limit "
+                "(finish_reason=length, max_tokens=%d); output may be truncated.",
+                self.settings.llm.max_output_tokens,
+            )
+        text = (choice.message.content or "").strip()
         if not text:
-            raise LLMError("opencode returned empty output")
-        return text
-
-    @staticmethod
-    def _format_event_error(event: dict[str, object]) -> str:
-        error = event.get("error")
-        if isinstance(error, dict):
-            data = error.get("data")
-            if isinstance(data, dict):
-                message = data.get("message")
-                if message:
-                    return str(message)
-            message = error.get("message")
-            if message:
-                return str(message)
-            name = error.get("name")
-            if name:
-                return str(name)
-        if error:
-            return str(error)
-        return "unknown error"
+            raise LLMError("openai-compatible API returned empty output")
+        return LLMResponse(text=text, raw=text)
 
 
-_PROVIDERS = {
+def _extract_model_ids(response: requests.Response) -> set[str]:
+    """Return model IDs from a best-effort OpenAI-compatible /models response."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return set()
+    if not isinstance(payload, dict):
+        return set()
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return set()
+    return {str(item["id"]) for item in data if isinstance(item, dict) and item.get("id")}
+
+
+_PROVIDERS: dict[str, type[CLIProvider] | type[OpenAICompatibleAPIProvider]] = {
     "claude": ClaudeCLIProvider,
     "codex": CodexCLIProvider,
     "copilot": CopilotCLIProvider,
     "gemini": GeminiCLIProvider,
-    "opencode": OpenCodeCLIProvider,
+    "openai-compatible": OpenAICompatibleAPIProvider,
 }
 
 
-def get_provider(settings: AppSettings) -> CLIProvider:
+def get_provider(settings: AppSettings) -> CLIProvider | OpenAICompatibleAPIProvider:
     """Return the configured provider implementation."""
     try:
         provider_class = _PROVIDERS[settings.llm.provider]

@@ -66,8 +66,7 @@ lookback_days_for_init = 14
 provider = "copilot"
 # Leave command blank to use the provider default executable.
 command = ""
-# Model names are provider-specific; copilot uses dot notation such as claude-sonnet-4.6;
-# opencode uses provider/model format such as ollama/llama2 or openai/gpt-5.2.
+# Model names are provider-specific; copilot uses dot notation such as claude-sonnet-4.6.
 model = "claude-sonnet-4.6"
 effort = "high"
 timeout_seconds = 600
@@ -76,6 +75,12 @@ temperature = 0.2
 max_output_tokens = 4096
 prompt_template = "pre_meeting_summary.md"
 note_template = "meeting_note.md"
+# Required when provider = "openai-compatible". Set to your local server's /v1 endpoint,
+# for example "http://127.0.0.1:1234/v1" for LM Studio or "http://127.0.0.1:8080/v1" for llama.cpp.
+# base_url = "http://127.0.0.1:1234/v1"
+# Optional: name of the environment variable that holds the API key for authenticated endpoints.
+# Leave blank for unauthenticated local servers.
+# api_key_env = ""
 
 [execution]
 max_parallel_sources = 4
