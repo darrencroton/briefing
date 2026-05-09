@@ -15,7 +15,7 @@ Use the source-specific guides under [`source-guides/`](source-guides/README.md)
 
 ## What `briefing` does
 
-`briefing` watches Apple Calendar for meetings starting soon, matches configured meeting series or explicit one-off `noted config` markers, gathers context from configured sources, asks an LLM CLI to draft the pre-meeting summary, and writes the result into a Markdown note.
+`briefing` watches Apple Calendar for meetings starting soon, matches configured meeting series or explicit one-off `noted config` markers, gathers context from configured sources, asks a configured LLM provider to draft the pre-meeting summary, and writes the result into a Markdown note.
 
 The runtime flow is:
 
@@ -57,7 +57,7 @@ Setup:
 - creates local runtime directories
 - validates the configured LLM provider when possible
 
-The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you choose another provider, rerun setup after updating `[llm]`. For `opencode` with a local model, ensure Ollama or LM Studio is running before running setup.
+The bootstrapped default provider is `copilot` with `model = "claude-sonnet-4.6"` and `effort = "high"`. If you choose another provider, rerun setup after updating `[llm]`. For `openai-compatible`, ensure the inference server is running before running setup.
 
 ### 2. Edit `user_config/settings.toml`
 
@@ -174,19 +174,24 @@ uv run briefing session-reprocess --session-dir /path/to/noted/session
 
 ## LLM provider setup
 
-`briefing` is CLI-only. It supports these provider values in `[llm]`:
+`briefing` supports these provider values in `[llm]`:
+
+CLI providers (invoke a locally installed binary):
 
 - `claude`
 - `codex`
 - `copilot`
 - `gemini`
-- `opencode`
 
-`command` is optional. If it is blank or omitted, `briefing` uses the default executable name for the provider.
+API provider (calls a local or self-hosted OpenAI-compatible server directly):
 
-`effort` may be blank, `low`, `medium`, or `high` for most providers. OpenCode maps `effort` to its `--variant` flag and also accepts `none`, `minimal`, `xhigh`, and `max`; leave it blank for models without a matching variant.
+- `openai-compatible`
 
-Legacy `claude_cli` is still accepted and normalized to `claude`.
+`command` is optional for CLI providers. If it is blank or omitted, `briefing` uses the default executable name.
+
+`effort` may be blank, `low`, `medium`, or `high` for CLI providers. It is not used for `openai-compatible`.
+
+Legacy `claude_cli` is still accepted and normalised to `claude`.
 
 ### Common provider setups
 
@@ -198,28 +203,25 @@ Legacy `claude_cli` is still accepted and normalized to `claude`.
   Run `copilot login`, or set `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`.
 - `gemini`
   Set `GEMINI_API_KEY`, or configure Vertex AI credentials with `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
-- `opencode`
-  For local LLMs: configure an OpenCode provider for Ollama or LM Studio, start Ollama (`ollama serve`) or LM Studio's API server, then set `llm.model` to `ollama/model-name` or `lmstudio/model-name`.
-  For cloud providers: run `opencode auth login`, use OpenCode's `/connect` flow, or set the relevant provider API key environment variable, then set `llm.model` to `provider/model`, such as `openai/gpt-5.2`.
-  Install opencode: `npm install -g opencode-ai` or see https://opencode.ai/docs/.
+- `openai-compatible`
+  Start your local inference server (LM Studio, llama.cpp `llama-server`, vLLM, LocalAI, or any service exposing `/v1/chat/completions`). Set `base_url` to its `/v1` endpoint and `model` to the model name the server expects. For authenticated endpoints, set `api_key_env` to the name of the environment variable that holds the API key; leave it blank for unauthenticated local servers.
 
-For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. OpenCode with local LLMs requires the local inference server to be running.
+For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. `openai-compatible` requires the inference server to be running before `briefing validate` or any run.
 
-### OpenCode model format
+### `openai-compatible` model names
 
-OpenCode uses a `provider/model` format for the `llm.model` setting. Examples:
+Set `model` to the exact name the server expects, which is usually the model filename or alias it was loaded with. Examples:
 
-| Backend | Example model value |
-|---------|-------------------|
-| Ollama (local) | `ollama/llama2` |
-| LM Studio (local) | `lmstudio/google/gemma-3n-e4b` |
-| Anthropic | `anthropic/claude-sonnet-4-5-20250929` |
-| OpenAI | `openai/gpt-5.2` |
-| Groq | `groq/llama-3.1-70b-versatile` |
-
-OpenCode maps `llm.effort` to the `--variant` flag. Built-in variants are provider-specific: common OpenAI variants include `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`; Anthropic commonly supports `high` and `max`.
+| Server | Example model value |
+|--------|-------------------|
+| LM Studio | `lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF` |
+| llama.cpp | `llama-3.1-8b-instruct` |
+| vLLM | `meta-llama/Meta-Llama-3.1-8B-Instruct` |
+| Ollama (OpenAI compat) | `llama3.1:8b` |
 
 ### Example `[llm]` blocks
+
+Copilot (CLI):
 
 ```toml
 [llm]
@@ -235,30 +237,16 @@ prompt_template = "pre_meeting_summary.md"
 note_template = "meeting_note.md"
 ```
 
-OpenCode with a local Ollama model:
+LM Studio or llama.cpp (OpenAI-compatible API):
 
 ```toml
 [llm]
-provider = "opencode"
+provider = "openai-compatible"
 command = ""
-model = "ollama/llama2"
+model = "your-loaded-model-name"
 effort = ""
-timeout_seconds = 600
-retry_attempts = 3
-temperature = 0.2
-max_output_tokens = 4096
-prompt_template = "pre_meeting_summary.md"
-note_template = "meeting_note.md"
-```
-
-OpenCode with a cloud provider:
-
-```toml
-[llm]
-provider = "opencode"
-command = ""
-model = "openai/gpt-5.2"
-effort = "high"
+base_url = "http://127.0.0.1:1234/v1"
+api_key_env = ""
 timeout_seconds = 600
 retry_attempts = 3
 temperature = 0.2
@@ -420,19 +408,21 @@ uv run briefing retention-sweep --dry-run
 
 ### `[llm]`
 
-- `provider`: `claude`, `codex`, `copilot`, `gemini`, or `opencode`
-- `command`: optional executable override
-- `model`: provider-specific model name; opencode uses `provider/model` format (e.g. `ollama/llama2`)
-- `effort`: blank, `low`, `medium`, or `high` for most providers; OpenCode also accepts `none`, `minimal`, `xhigh`, and `max`
-- `timeout_seconds`: timeout for one LLM call; OpenCode validation uses a shorter readiness timeout
+- `provider`: `claude`, `codex`, `copilot`, `gemini`, or `openai-compatible`
+- `command`: optional executable override (CLI providers only)
+- `model`: provider-specific model name; for `openai-compatible` this is the exact name the server expects
+- `effort`: blank, `low`, `medium`, or `high`; not used for `openai-compatible`
+- `timeout_seconds`: timeout for one LLM call; readiness checks use a 15-second cap
 - `retry_attempts`: retained in config but not used by the current provider implementation
-- `temperature`: retained in config but not used by the current provider implementation
-- `max_output_tokens`: retained in config but not used by the current provider implementation
+- `temperature`: sampling temperature
+- `max_output_tokens`: maximum tokens in the LLM response
 - `prompt_template`: prompt template filename under `user_config/prompts/`
 - `note_template`: note template filename under `user_config/templates/`
+- `base_url`: required for `openai-compatible`; the `/v1` base URL of the inference server
+- `api_key_env`: optional for `openai-compatible`; name of the environment variable holding the API key
 - `briefing` does not apply a separate global prompt truncation step after source collection; source-specific `max_characters` settings are the real input budget
 
-Gemini ignores `llm.effort` and uses Gemini defaults. OpenCode maps `llm.effort` to the `--variant` flag; leave it blank if the selected model has no matching variant.
+Gemini ignores `llm.effort` and uses Gemini defaults.
 
 ### `[slack]`
 

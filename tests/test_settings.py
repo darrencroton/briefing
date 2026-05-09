@@ -160,6 +160,76 @@ note_template = "meeting_note.md"
         load_settings(tmp_path)
 
 
+def test_load_settings_parses_openai_compatible_provider(tmp_path: Path) -> None:
+    _write_settings(
+        tmp_path,
+        """
+provider = "openai-compatible"
+command = ""
+model = "local-model"
+effort = ""
+base_url = "http://127.0.0.1:1234/v1"
+api_key_env = "LOCAL_LLM_KEY"
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+""",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.llm.provider == "openai-compatible"
+    assert settings.llm.base_url == "http://127.0.0.1:1234/v1"
+    assert settings.llm.api_key_env == "LOCAL_LLM_KEY"
+    assert settings.llm.command == ""
+
+
+def test_load_settings_rejects_openai_compatible_without_base_url(tmp_path: Path) -> None:
+    _write_settings(
+        tmp_path,
+        """
+provider = "openai-compatible"
+model = "local-model"
+effort = ""
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+""",
+    )
+
+    with pytest.raises(SettingsError, match=r"base_url"):
+        load_settings(tmp_path)
+
+
+def test_load_settings_base_url_and_api_key_env_default_to_none_for_cli_providers(tmp_path: Path) -> None:
+    _write_settings(
+        tmp_path,
+        """
+provider = "claude"
+command = "claude"
+model = "sonnet"
+effort = ""
+timeout_seconds = 600
+retry_attempts = 3
+temperature = 0.2
+max_output_tokens = 4096
+prompt_template = "pre_meeting_summary.md"
+note_template = "meeting_note.md"
+""",
+    )
+
+    settings = load_settings(tmp_path)
+
+    assert settings.llm.base_url is None
+    assert settings.llm.api_key_env is None
+
+
 def test_load_settings_rejects_invalid_effort(tmp_path: Path) -> None:
     _write_settings(
         tmp_path,
@@ -180,29 +250,6 @@ note_template = "meeting_note.md"
     with pytest.raises(SettingsError, match=r"\[llm\]\.effort"):
         load_settings(tmp_path)
 
-
-@pytest.mark.parametrize("effort", ["none", "minimal", "low", "medium", "high", "xhigh", "max"])
-def test_load_settings_accepts_opencode_variant_efforts(tmp_path: Path, effort: str) -> None:
-    _write_settings(
-        tmp_path,
-        f"""
-provider = "opencode"
-command = ""
-model = "openai/gpt-5.2"
-effort = "{effort}"
-timeout_seconds = 600
-retry_attempts = 3
-temperature = 0.2
-max_output_tokens = 4096
-prompt_template = "pre_meeting_summary.md"
-note_template = "meeting_note.md"
-""",
-    )
-
-    settings = load_settings(tmp_path)
-
-    assert settings.llm.command == "opencode"
-    assert settings.llm.effort == effort
 
 
 def test_load_settings_uses_default_command_when_blank(tmp_path: Path) -> None:

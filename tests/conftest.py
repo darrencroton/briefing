@@ -112,6 +112,8 @@ def app_settings(tmp_path: Path) -> AppSettings:
             max_output_tokens=4096,
             prompt_template="pre_meeting_summary.md",
             note_template="meeting_note.md",
+            base_url=None,
+            api_key_env=None,
         ),
         slack=SlackSettings(
             history_days=7,

@@ -34,9 +34,10 @@ Only meetings you have explicitly configured are processed. If a required source
 
 - macOS (EventKit requires Apple Calendar)
 - Python 3.13+ and `uv` on `PATH`
-- One supported LLM CLI, authenticated for non-interactive use
+- One supported LLM provider, authenticated for non-interactive use
 
-Supported LLM CLIs: `claude`, `codex`, `copilot`, `gemini`, `opencode`
+Supported CLI providers: `claude`, `codex`, `copilot`, `gemini`
+Supported API provider: `openai-compatible` (LM Studio, llama.cpp, vLLM, LocalAI, and any `/v1/chat/completions` server)
 
 For recording: `noted` installed and on `PATH` (see the [`noted` repo](../noted/README.md))
 
@@ -54,7 +55,7 @@ Edit `user_config/settings.toml` to set your LLM provider and notes location. Th
 
 ```toml
 [llm]
-provider = "copilot"    # or claude, codex, gemini, opencode
+provider = "copilot"    # or claude, codex, gemini, openai-compatible
 model = "claude-sonnet-4.6"
 effort = "high"
 ```
@@ -65,9 +66,9 @@ Authenticate your chosen provider before installing automation:
 - `codex` → `codex login`
 - `copilot` → `copilot login` (or set `COPILOT_GITHUB_TOKEN`)
 - `gemini` → set `GEMINI_API_KEY` (or configure Vertex AI credentials)
-- `opencode` → run `opencode auth login` or set the relevant provider API key; for local LLMs, configure and start Ollama or LM Studio
+- `openai-compatible` → start your local inference server (LM Studio, llama.cpp, vLLM, etc.) and set `base_url` to its `/v1` endpoint; set `api_key_env` to an env var holding the key for authenticated endpoints
 
-**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `opencode` uses `provider/model` format (e.g. `ollama/llama2` or `openai/gpt-5.2`).
+**Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `openai-compatible` uses the model name exactly as registered by the server.
 
 The full settings reference is in [`docs/setup-and-configuration-walkthrough.md`](docs/setup-and-configuration-walkthrough.md).
 

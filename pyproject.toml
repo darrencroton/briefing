@@ -12,6 +12,7 @@ dependencies = [
   "PyYAML>=6.0.2,<7",
   "jsonschema[format-nongpl]>=4.22,<5",
   "pyobjc-framework-EventKit>=11.0; sys_platform == 'darwin'",
+  "openai>=1.0.0,<2",
   "requests>=2.32.3,<3",
 ]
 

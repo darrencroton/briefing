@@ -104,6 +104,8 @@ class LLMSettings:
     max_output_tokens: int
     prompt_template: str
     note_template: str
+    base_url: str | None
+    api_key_env: str | None
 
 
 @dataclass(slots=True)
@@ -160,18 +162,14 @@ class AppSettings:
     logging: LoggingSettings
 
 
-_SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini", "opencode")
+_SUPPORTED_LLM_PROVIDERS = ("claude", "codex", "copilot", "gemini", "openai-compatible")
 _LEGACY_LLM_PROVIDERS = {"claude_cli": "claude"}
 _VALID_LLM_EFFORTS = ("low", "medium", "high")
-_VALID_LLM_EFFORTS_BY_PROVIDER = {
-    "opencode": ("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-}
 _DEFAULT_LLM_COMMANDS = {
     "claude": "claude",
     "codex": "codex",
     "copilot": "copilot",
     "gemini": "gemini",
-    "opencode": "opencode",
 }
 _VALID_MODE_TYPES = ("in_person", "online", "hybrid")
 _VALID_ASR_BACKENDS = ("whisperkit", "fluidaudio-parakeet", "sfspeech")
@@ -571,22 +569,31 @@ def _parse_llm_settings(raw: Any) -> dict[str, Any]:
 
     raw_command = raw.get("command")
     command = str(raw_command).strip() if raw_command is not None else ""
-    if not command:
+    if not command and provider in _DEFAULT_LLM_COMMANDS:
         command = _DEFAULT_LLM_COMMANDS[provider]
 
     raw_effort = raw.get("effort")
     effort = str(raw_effort).strip().lower() if raw_effort is not None else ""
-    valid_efforts = _VALID_LLM_EFFORTS_BY_PROVIDER.get(provider, _VALID_LLM_EFFORTS)
-    if effort and effort not in valid_efforts:
+    if effort and effort not in _VALID_LLM_EFFORTS:
         raise SettingsError(
             "Invalid settings file: [llm].effort must be blank or one of "
-            f"{', '.join(valid_efforts)} for provider {provider!r}."
+            f"{', '.join(_VALID_LLM_EFFORTS)} for provider {provider!r}."
+        )
+
+    base_url = _optional_str(raw.get("base_url"))
+    api_key_env = _optional_str(raw.get("api_key_env"))
+
+    if provider == "openai-compatible" and not base_url:
+        raise SettingsError(
+            "Invalid settings file: [llm].base_url is required when provider is 'openai-compatible'."
         )
 
     parsed = dict(raw)
     parsed["provider"] = provider
     parsed["command"] = command
     parsed["effort"] = effort
+    parsed["base_url"] = base_url
+    parsed["api_key_env"] = api_key_env
     return parsed
 
 
