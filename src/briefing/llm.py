@@ -368,6 +368,7 @@ class OpenAICompatibleAPIProvider:
         self._setup()
 
     def _setup(self) -> None:
+        import httpx
         import openai
 
         self.base_url = (self.settings.llm.base_url or "").strip().rstrip("/")
@@ -381,11 +382,25 @@ class OpenAICompatibleAPIProvider:
 
         api_key_env = (self.settings.llm.api_key_env or "").strip()
         self.api_key = os.getenv(api_key_env) if api_key_env else ""
-        self.client = openai.OpenAI(
-            api_key=self.api_key or "not-needed",
-            base_url=self.base_url,
-            timeout=float(self.settings.llm.timeout_seconds),
-        )
+
+        if self.api_key:
+            self.client = openai.OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=float(self.settings.llm.timeout_seconds),
+            )
+        else:
+            # No API key — strip the Authorization header the SDK injects so
+            # unauthenticated servers don't receive an unexpected Bearer token.
+            def _strip_auth(request: httpx.Request) -> None:
+                request.headers.pop("authorization", None)
+
+            self.client = openai.OpenAI(
+                api_key="not-needed",
+                base_url=self.base_url,
+                timeout=float(self.settings.llm.timeout_seconds),
+                http_client=httpx.Client(event_hooks={"request": [_strip_auth]}),
+            )
 
     def validate(self) -> tuple[bool, str]:
         """Check whether the configured endpoint is reachable."""

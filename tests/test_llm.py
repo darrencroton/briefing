@@ -464,6 +464,62 @@ def test_openai_compatible_generate_sends_correct_request(
     ]
 
 
+def test_openai_compatible_strips_auth_header_when_no_api_key_configured(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    import httpx
+
+    captured_http_client: list[object] = []
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        captured_http_client.append(kwargs.get("http_client"))
+        return FakeOpenAIClient(**{k: v for k, v in kwargs.items() if k != "http_client"})
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+
+    OpenAICompatibleAPIProvider(app_settings)
+
+    http_client = captured_http_client[0]
+    assert isinstance(http_client, httpx.Client)
+    # Verify the event hook strips any Authorization header the SDK injects
+    fake_req = httpx.Request(
+        "POST", "http://127.0.0.1:1234/v1/chat/completions",
+        headers={"authorization": "Bearer not-needed", "content-type": "application/json"},
+    )
+    for hook in http_client.event_hooks["request"]:
+        hook(fake_req)
+    assert "authorization" not in dict(fake_req.headers)
+    assert "content-type" in dict(fake_req.headers)
+
+
+def test_openai_compatible_authenticated_client_uses_api_key_without_http_client_override(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    monkeypatch.setenv("MY_LLM_KEY", "real-api-key")
+    all_kwargs: list[dict[str, object]] = []
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        all_kwargs.append(dict(kwargs))
+        return FakeOpenAIClient(**{k: v for k, v in kwargs.items() if k != "http_client"})
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = "MY_LLM_KEY"
+
+    OpenAICompatibleAPIProvider(app_settings)
+
+    assert all_kwargs[0]["api_key"] == "real-api-key"
+    assert "http_client" not in all_kwargs[0]
+
+
 def test_openai_compatible_generate_raises_on_empty_output(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,
