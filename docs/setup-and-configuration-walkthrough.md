@@ -6,7 +6,7 @@ It covers:
 
 - what the tool does
 - how to get a minimal working setup
-- how to choose and validate an LLM CLI
+- how to choose and validate an LLM provider
 - how `init-series` works
 - how Meeting Intelligence planning and `noted` recording handoff works
 - what to check when validation or runs fail
@@ -23,7 +23,7 @@ The runtime flow is:
 2. match each upcoming event against `user_config/series/*.yaml`
 3. collect sources for the matched series
 4. render the prompt template
-5. invoke the configured LLM CLI
+5. invoke the configured LLM provider
 6. write or refresh the managed `Briefing` block
 7. save occurrence state and run diagnostics
 
@@ -208,6 +208,8 @@ Legacy `claude_cli` is still accepted and normalised to `claude`.
 
 For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. `openai-compatible` requires the inference server to be running before `briefing validate` or any run.
 
+For post-meeting summaries, choose a local model/server context window that comfortably fits a full meeting transcript plus the prompt and note context. A recent one-hour transcript was about 57 KB, roughly 15k prompt tokens before note context. For local reasoning models, use a 32k+ context window and keep `max_output_tokens = 16384` unless you know the model needs less; hidden thinking tokens can consume part of this output budget. `briefing` treats token-limit completions as failures so a truncated summary is not written.
+
 ### `openai-compatible` model names
 
 Set `model` to the exact name the server expects, which is usually the model filename or alias it was loaded with. Examples:
@@ -250,7 +252,7 @@ api_key_env = ""
 timeout_seconds = 600
 retry_attempts = 3
 temperature = 0.2
-max_output_tokens = 4096
+max_output_tokens = 16384
 prompt_template = "pre_meeting_summary.md"
 note_template = "meeting_note.md"
 ```
@@ -415,7 +417,7 @@ uv run briefing retention-sweep --dry-run
 - `timeout_seconds`: timeout for one LLM call; readiness checks use a 15-second cap
 - `retry_attempts`: retained in config but not used by the current provider implementation
 - `temperature`: sampling temperature
-- `max_output_tokens`: maximum tokens in the LLM response
+- `max_output_tokens`: maximum tokens in the LLM response; use `16384` for `openai-compatible` local reasoning models unless you have measured a lower safe value
 - `prompt_template`: prompt template filename under `user_config/prompts/`
 - `note_template`: note template filename under `user_config/templates/`
 - `base_url`: required for `openai-compatible`; the `/v1` base URL of the inference server
@@ -464,8 +466,8 @@ Gemini ignores `llm.effort` and uses Gemini defaults.
 Typical failures:
 
 - EventKit calendar access is not granted
-- the selected LLM CLI is missing
-- the selected LLM CLI is installed but not authenticated for unattended use
+- the selected CLI provider binary is missing
+- the selected LLM provider is not authenticated or reachable for unattended use
 - required Slack or Notion tokens are missing for configured sources
 - configured file sources do not exist
 
@@ -491,10 +493,10 @@ Open System Settings > Privacy & Security > Calendars and enable access for your
 Usually one of:
 
 - the configured CLI is not installed
-- the CLI is not authenticated for unattended use
+- the selected LLM provider is not authenticated or reachable for unattended use
 - `[llm].provider` is invalid
 - Gemini is configured only through interactive Google OAuth instead of API-key or Vertex-style automation credentials
-- OpenCode is configured with a local model but the inference server (Ollama or LM Studio) is not running
+- `openai-compatible` is configured but the inference server is not running, `base_url` is wrong, or the configured model is not loaded
 
 ### `run` does nothing
 
@@ -521,7 +523,7 @@ Review the YAML match groups. The most common issue is over-constraining the ser
 ## Recommended rollout order
 
 1. Set `vault_root` and `meeting_notes_dir`.
-2. Confirm calendar access and one LLM CLI work with `uv run briefing validate`.
+2. Confirm calendar access and one LLM provider works with `uv run briefing validate`.
 3. Create one series with `uv run briefing init-series --index N`.
 4. Simplify that series until it matches reliably.
 5. Run `uv run briefing run` close to a real meeting.

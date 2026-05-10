@@ -371,6 +371,7 @@ class OpenAICompatibleAPIProvider:
         import httpx
         import openai
 
+        self._openai_error = openai.OpenAIError
         self.base_url = (self.settings.llm.base_url or "").strip().rstrip("/")
         if not self.base_url:
             raise LLMError(
@@ -434,23 +435,34 @@ class OpenAICompatibleAPIProvider:
 
     def generate(self, prompt: str) -> LLMResponse:
         """Generate text from a prompt via the chat completions endpoint."""
-        response = self.client.chat.completions.create(
-            model=self.settings.llm.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=self.settings.llm.temperature,
-            max_tokens=self.settings.llm.max_output_tokens,
-        )
-        choice = response.choices[0]
-        if choice.finish_reason == "length":
-            LOGGER.warning(
-                "OpenAI-compatible API hit the token limit "
-                "(finish_reason=length, max_tokens=%d); output may be truncated.",
-                self.settings.llm.max_output_tokens,
+        try:
+            response = self.client.chat.completions.create(
+                model=self.settings.llm.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.settings.llm.temperature,
+                max_tokens=self.settings.llm.max_output_tokens,
             )
-        text = (choice.message.content or "").strip()
+        except self._openai_error as exc:
+            raise LLMError(f"OpenAI-compatible API request failed: {exc}") from exc
+
+        try:
+            choice = response.choices[0]
+            finish_reason = getattr(choice, "finish_reason", None)
+            text = (choice.message.content or "").strip()
+        except (AttributeError, IndexError, TypeError) as exc:
+            raise LLMError("OpenAI-compatible API returned a malformed response") from exc
+
+        if finish_reason == "length":
+            raise LLMError(
+                "OpenAI-compatible API hit the token limit "
+                f"(finish_reason=length, max_tokens={self.settings.llm.max_output_tokens}); "
+                "no summary was written because the output may be truncated. Increase "
+                "[llm].max_output_tokens and ensure the local model/server has enough context "
+                "for the prompt plus any thinking tokens."
+            )
         if not text:
             raise LLMError("openai-compatible API returned empty output")
-        return LLMResponse(text=text, raw=text)
+        return LLMResponse(text=text, raw=_serialize_openai_response(response, fallback_text=text))
 
 
 def _extract_model_ids(response: requests.Response) -> set[str]:
@@ -465,6 +477,25 @@ def _extract_model_ids(response: requests.Response) -> set[str]:
     if not isinstance(data, list):
         return set()
     return {str(item["id"]) for item in data if isinstance(item, dict) and item.get("id")}
+
+
+def _serialize_openai_response(response: object, *, fallback_text: str) -> str:
+    """Return useful debug output for OpenAI SDK response objects."""
+    try:
+        model_dump_json = getattr(response, "model_dump_json", None)
+        if callable(model_dump_json):
+            return str(model_dump_json(indent=2))
+
+        model_dump = getattr(response, "model_dump", None)
+        if callable(model_dump):
+            return json.dumps(model_dump(mode="json"), indent=2, sort_keys=True)
+
+        to_dict = getattr(response, "to_dict", None)
+        if callable(to_dict):
+            return json.dumps(to_dict(), indent=2, sort_keys=True)
+    except Exception:
+        pass
+    return fallback_text
 
 
 _PROVIDERS: dict[str, type[CLIProvider] | type[OpenAICompatibleAPIProvider]] = {

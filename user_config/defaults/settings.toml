@@ -72,7 +72,9 @@ effort = "high"
 timeout_seconds = 600
 retry_attempts = 3
 temperature = 0.2
-max_output_tokens = 4096
+# Generous enough for one-hour post-meeting transcripts and local reasoning models
+# that spend part of the completion budget on hidden thinking tokens.
+max_output_tokens = 16384
 prompt_template = "pre_meeting_summary.md"
 note_template = "meeting_note.md"
 # Required when provider = "openai-compatible". Set to your local server's /v1 endpoint,

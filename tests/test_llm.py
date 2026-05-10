@@ -464,6 +464,46 @@ def test_openai_compatible_generate_sends_correct_request(
     ]
 
 
+def test_openai_compatible_generate_keeps_response_metadata_in_raw(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    class FakeResponseWithDump:
+        choices = [
+            type(
+                "Choice",
+                (),
+                {
+                    "message": type("Message", (), {"content": "model output"}),
+                    "finish_reason": "stop",
+                },
+            )()
+        ]
+
+        def model_dump_json(self, *, indent: int) -> str:
+            assert indent == 2
+            return '{"id":"chatcmpl-local","usage":{"completion_tokens":12}}'
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+        client.chat.completions.create = lambda **kw: FakeResponseWithDump()
+        return client
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+
+    provider = OpenAICompatibleAPIProvider(app_settings)
+
+    response = provider.generate("prompt")
+
+    assert response.text == "model output"
+    assert "chatcmpl-local" in response.raw
+    assert "completion_tokens" in response.raw
+
+
 def test_openai_compatible_strips_auth_header_when_no_api_key_configured(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,
@@ -543,9 +583,43 @@ def test_openai_compatible_generate_raises_on_empty_output(
         provider.generate("prompt")
 
 
-def test_openai_compatible_generate_warns_on_truncation(
+def test_openai_compatible_generate_wraps_sdk_errors(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
+    app_settings,
+) -> None:
+    provider, clients = _make_api_provider(app_settings, monkeypatch)
+    provider._openai_error = RuntimeError
+    clients[0].chat.completions.create = lambda **kw: (_ for _ in ()).throw(
+        RuntimeError("connection refused")
+    )
+
+    with pytest.raises(LLMError, match="request failed: connection refused"):
+        provider.generate("prompt")
+
+
+def test_openai_compatible_generate_raises_on_malformed_response(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+        client.chat.completions.create = lambda **kw: type("Response", (), {"choices": []})()
+        return client
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+
+    provider = OpenAICompatibleAPIProvider(app_settings)
+
+    with pytest.raises(LLMError, match="malformed response"):
+        provider.generate("prompt")
+
+
+def test_openai_compatible_generate_raises_on_truncation(
+    monkeypatch: pytest.MonkeyPatch,
     app_settings,
 ) -> None:
     def fake_openai(**kwargs: object) -> FakeOpenAIClient:
@@ -564,11 +638,5 @@ def test_openai_compatible_generate_warns_on_truncation(
 
     provider = OpenAICompatibleAPIProvider(app_settings)
 
-    with caplog.at_level(logging.WARNING):
-        response = provider.generate("prompt")
-
-    assert response.text == "truncated"
-    assert any(
-        "finish_reason=length" in r.message and "512" in r.message
-        for r in caplog.records
-    )
+    with pytest.raises(LLMError, match=r"finish_reason=length.*512"):
+        provider.generate("prompt")

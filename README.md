@@ -241,6 +241,6 @@ archive/                  retained local material (git-ignored)
 ## Operational Notes
 
 - macOS will prompt for Calendar access on first run. Grant it, or enable it in System Settings > Privacy & Security > Calendars.
-- The selected LLM CLI must already be authenticated before installing `launchd`.
+- The selected LLM provider must already be automation-ready before installing `launchd`.
 - `launchd` runs in the local Mac timezone.
 - The Mac must be awake for scheduled runs to happen on time.
