@@ -543,6 +543,44 @@ def test_openai_compatible_generate_raises_on_empty_output(
         provider.generate("prompt")
 
 
+def test_openai_compatible_generate_wraps_openai_sdk_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    import httpx
+    import openai
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        client = FakeOpenAIClient(**kwargs)
+
+        def fail_create(**kw: object) -> object:
+            raise openai.APIConnectionError(
+                request=httpx.Request(
+                    "POST",
+                    "http://127.0.0.1:1234/v1/chat/completions",
+                )
+            )
+
+        client.chat.completions.create = fail_create
+        return client
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = ""
+
+    provider = OpenAICompatibleAPIProvider(app_settings)
+
+    with pytest.raises(LLMError) as excinfo:
+        provider.generate("prompt")
+
+    message = str(excinfo.value)
+    assert "OpenAI-compatible request failed" in message
+    assert "base_url=http://127.0.0.1:1234/v1" in message
+    assert "model=local-model" in message
+
+
 def test_openai_compatible_generate_warns_on_truncation(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,

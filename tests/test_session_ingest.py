@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from briefing.llm import LLMResponse
+from briefing.llm import LLMError, LLMResponse
 from briefing.main import _session_ingest
 from briefing.notes import NoteStructureError
 from briefing.session.completion import (
@@ -50,6 +50,13 @@ class StubProvider:
     def generate(self, prompt: str) -> LLMResponse:
         self.prompts.append(prompt)
         return LLMResponse(text=self.text, raw=self.text)
+
+
+class FailingProvider:
+    """Minimal LLM provider stub that simulates a failed summary call."""
+
+    def generate(self, prompt: str) -> LLMResponse:
+        raise LLMError("provider unavailable")
 
 
 @dataclass(slots=True)
@@ -526,6 +533,38 @@ def test_ingest_dry_run_does_not_run_retention(
 
     assert result.ok
     assert calls == []
+
+
+def test_ingest_llm_failure_returns_structured_exit_6(app_settings, tmp_path: Path) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+
+    result = run_session_ingest(app_settings, fx.session_dir, provider=FailingProvider())
+
+    assert not result.ok
+    assert result.exit_code == 6
+    assert result.decision == IngestDecision.SUMMARISE.value
+    assert result.error == "Post-meeting LLM call failed: provider unavailable"
+    assert not fx.note_path.exists()
+
+
+def test_ingest_provider_setup_failure_returns_structured_exit_6(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+    tmp_path: Path,
+) -> None:
+    fx = _write_session(tmp_path, "completed.json")
+
+    def fail_get_provider(settings) -> object:
+        raise LLMError("provider setup failed")
+
+    monkeypatch.setattr("briefing.session.ingest.get_provider", fail_get_provider)
+
+    result = run_session_ingest(app_settings, fx.session_dir)
+
+    assert not result.ok
+    assert result.exit_code == 6
+    assert result.error == "provider setup failed"
+    assert not fx.note_path.exists()
 
 
 def test_ingest_prompt_receives_diarized_speaker_labels(app_settings, tmp_path: Path) -> None:

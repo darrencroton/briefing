@@ -23,7 +23,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..llm import get_provider
+from ..llm import LLMError, get_provider
 from ..notes import NoteStructureError
 from ..settings import AppSettings
 from .completion import Completion, read_completion
@@ -108,8 +108,8 @@ def _reprocess(
     effective_completion = completion or _synthetic_completion(loaded, session_dir)
 
     # LLM call.
-    active_provider = provider if provider is not None else get_provider(settings)
     try:
+        active_provider = provider if provider is not None else get_provider(settings)
         summary = generate_summary(
             settings,
             active_provider,
@@ -121,11 +121,11 @@ def _reprocess(
             ),
             debug_key=f"{loaded.manifest.session_id}-reprocess",
         )
-    except SummaryGenerationError as exc:
+    except (SummaryGenerationError, LLMError) as exc:
         LOGGER.error("Summary generation failed: %s", exc)
         return error_result(
             session_dir,
-            exc.exit_code,
+            getattr(exc, "exit_code", SummaryGenerationError.exit_code),
             str(exc),
             session_id=loaded.manifest.session_id,
             note_path=str(loaded.note_path),

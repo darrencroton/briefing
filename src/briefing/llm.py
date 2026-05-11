@@ -434,12 +434,20 @@ class OpenAICompatibleAPIProvider:
 
     def generate(self, prompt: str) -> LLMResponse:
         """Generate text from a prompt via the chat completions endpoint."""
-        response = self.client.chat.completions.create(
-            model=self.settings.llm.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=self.settings.llm.temperature,
-            max_tokens=self.settings.llm.max_output_tokens,
-        )
+        import openai
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.settings.llm.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.settings.llm.temperature,
+                max_tokens=self.settings.llm.max_output_tokens,
+            )
+        except openai.OpenAIError as exc:
+            raise LLMError(
+                "OpenAI-compatible request failed "
+                f"(base_url={self.base_url}, model={self.settings.llm.model}): {exc}"
+            ) from exc
         choice = response.choices[0]
         if choice.finish_reason == "length":
             LOGGER.warning(
