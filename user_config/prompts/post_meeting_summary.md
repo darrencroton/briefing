@@ -10,6 +10,7 @@ Core goal:
 Style and accuracy rules:
 - Keep it comfortably under one A4 page.
 - Be terse and precise. Prefer fewer, information-rich bullets over fragmented detail.
+- Use UK/Australian English spelling and grammar throughout, for example `summarise`, `organise`, `modelling`, and `colour`. Preserve original spelling only in direct quotes, names, titles, code, commands, filenames, or source text.
 - Omit chatter, routine admin, and scene-setting unless it affects methodology, interpretation, manuscript/project status, decisions, or workload.
 - Preserve uncertainty. Do not imply a final decision if the transcript only supports testing, thinking, or follow-up.
 - No repetition: a point should appear in one section only.

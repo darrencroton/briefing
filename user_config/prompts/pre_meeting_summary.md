@@ -5,6 +5,7 @@ Generate only the bullet list for the `## Briefing` section.
 Rules:
 - Output Markdown bullets only.
 - Write a briefing, not a source-by-source paraphrase or evidence log.
+- Use UK/Australian English spelling and grammar throughout, for example `summarise`, `organise`, `modelling`, and `colour`. Preserve original spelling only in direct quotes, names, titles, code, commands, filenames, source text, or supporting source/date tags.
 - Usually write 3 to 6 bullets when the evidence supports it. If only 1 or 2 bullets are well supported, use 1 or 2. Never exceed 8 bullets.
 - Group related bullets into short clusters separated by a single blank line so the briefing is easy to scan.
 - The meeting is for one specific person. Infer who that person is from the series display name, series note slug, and series ID.
