@@ -520,6 +520,37 @@ def test_openai_compatible_authenticated_client_uses_api_key_without_http_client
     assert "http_client" not in all_kwargs[0]
 
 
+def test_openai_compatible_reads_api_key_from_shared_llm_env_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    app_settings,
+) -> None:
+    monkeypatch.delenv("LOCAL_LLM_API_KEY", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    llm_dir = tmp_path / ".llm"
+    llm_dir.mkdir()
+    (llm_dir / ".env.llm").write_text(
+        'export LOCAL_LLM_API_KEY="shared-key"\n',
+        encoding="utf-8",
+    )
+    all_kwargs: list[dict[str, object]] = []
+
+    def fake_openai(**kwargs: object) -> FakeOpenAIClient:
+        all_kwargs.append(dict(kwargs))
+        return FakeOpenAIClient(**{k: v for k, v in kwargs.items() if k != "http_client"})
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    app_settings.llm.provider = "openai-compatible"
+    app_settings.llm.base_url = "http://127.0.0.1:1234/v1"
+    app_settings.llm.model = "local-model"
+    app_settings.llm.api_key_env = "LOCAL_LLM_API_KEY"
+
+    OpenAICompatibleAPIProvider(app_settings)
+
+    assert all_kwargs[0]["api_key"] == "shared-key"
+    assert "http_client" not in all_kwargs[0]
+
+
 def test_openai_compatible_generate_raises_on_empty_output(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,

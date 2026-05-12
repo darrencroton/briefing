@@ -62,11 +62,11 @@ effort = "high"
 
 Authenticate your chosen provider before installing automation:
 
-- `claude` → `claude auth login`
-- `codex` → `codex login`
-- `copilot` → `copilot login` (or set `COPILOT_GITHUB_TOKEN`)
-- `gemini` → set `GEMINI_API_KEY` (or configure Vertex AI credentials)
-- `openai-compatible` → start your local inference server (LM Studio, llama.cpp, vLLM, etc.) and set `base_url` to its `/v1` endpoint; set `api_key_env` to an env var holding the key for authenticated endpoints
+- `claude`: run `claude auth login`
+- `codex`: run `codex login`
+- `copilot`: run `copilot login`, or set `COPILOT_GITHUB_TOKEN`
+- `gemini`: set `GEMINI_API_KEY`, or configure Vertex AI credentials
+- `openai-compatible`: start your local inference server and set `base_url` to its `/v1` endpoint. For authenticated endpoints, set `api_key_env = "LOCAL_LLM_API_KEY"` and store the actual key in `~/.llm/.env.llm`.
 
 **Note:** The `claude` CLI uses dash-separated model IDs (e.g. `claude-sonnet-4-5`); `copilot` uses dot-separated (e.g. `claude-sonnet-4.6`); `openai-compatible` uses the model name exactly as registered by the server.
 
@@ -78,6 +78,16 @@ The default env file is `~/.env.briefing`. Add secrets only for the sources you 
 
 - `SLACK_USER_TOKEN`
 - `NOTION_TOKEN`
+
+For an authenticated local LLM router shared across repos, keep the key in
+`~/.llm/.env.llm` instead:
+
+```bash
+mkdir -p ~/.llm
+chmod 700 ~/.llm
+printf 'export LOCAL_LLM_API_KEY=%q\n' '<router-api-key>' > ~/.llm/.env.llm
+chmod 600 ~/.llm/.env.llm
+```
 
 ### 4. Validate
 

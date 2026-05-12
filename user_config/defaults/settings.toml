@@ -79,7 +79,8 @@ note_template = "meeting_note.md"
 # for example "http://127.0.0.1:1234/v1" for LM Studio or "http://127.0.0.1:8080/v1" for llama.cpp.
 # base_url = "http://127.0.0.1:1234/v1"
 # Optional: name of the environment variable that holds the API key for authenticated endpoints.
-# Leave blank for unauthenticated local servers.
+# briefing checks the process environment, paths.env_file, and ~/.llm/.env.llm.
+# Use "LOCAL_LLM_API_KEY" for the shared local-router setup.
 # api_key_env = ""
 
 [execution]

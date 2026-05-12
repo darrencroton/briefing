@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
-from .settings import AppSettings
+from .settings import AppSettings, load_env_file
 
 
 LOGGER = logging.getLogger(__name__)
@@ -381,7 +381,7 @@ class OpenAICompatibleAPIProvider:
             raise LLMError("OpenAI-compatible provider requires [llm].model.")
 
         api_key_env = (self.settings.llm.api_key_env or "").strip()
-        self.api_key = os.getenv(api_key_env) if api_key_env else ""
+        self.api_key = self._resolve_api_key(api_key_env)
 
         if self.api_key:
             self.client = openai.OpenAI(
@@ -401,6 +401,25 @@ class OpenAICompatibleAPIProvider:
                 timeout=float(self.settings.llm.timeout_seconds),
                 http_client=httpx.Client(event_hooks={"request": [_strip_auth]}),
             )
+
+    def _resolve_api_key(self, api_key_env: str) -> str:
+        """Resolve a configured API key from process env or known local env files."""
+        if not api_key_env:
+            return ""
+        if value := os.getenv(api_key_env):
+            return value
+
+        candidate_paths = [self.settings.paths.env_file, Path.home() / ".llm" / ".env.llm"]
+        seen: set[Path] = set()
+        for path in candidate_paths:
+            resolved = path.expanduser()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            values = load_env_file(resolved)
+            if value := values.get(api_key_env):
+                return value
+        return ""
 
     def validate(self) -> tuple[bool, str]:
         """Check whether the configured endpoint is reachable."""

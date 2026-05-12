@@ -204,7 +204,7 @@ Legacy `claude_cli` is still accepted and normalised to `claude`.
 - `gemini`
   Set `GEMINI_API_KEY`, or configure Vertex AI credentials with `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
 - `openai-compatible`
-  Start your local inference server (LM Studio, llama.cpp `llama-server`, vLLM, LocalAI, or any service exposing `/v1/chat/completions`). Set `base_url` to its `/v1` endpoint and `model` to the model name the server expects. For authenticated endpoints, set `api_key_env` to the name of the environment variable that holds the API key; leave it blank for unauthenticated local servers.
+  Start your local inference server (LM Studio, llama.cpp `llama-server`, vLLM, LocalAI, or any service exposing `/v1/chat/completions`). Set `base_url` to its `/v1` endpoint and `model` to the model name the server expects. For authenticated endpoints, set `api_key_env` to the name of the environment variable that holds the API key; leave it blank for unauthenticated local servers. The shared local-router convention is `api_key_env = "LOCAL_LLM_API_KEY"` with the actual key stored in `~/.llm/.env.llm`.
 
 For scheduled automation, the chosen provider must already work without an interactive prompt. Gemini support is for API-key or Vertex-style automation credentials, not interactive Google OAuth. `openai-compatible` requires the inference server to be running before `briefing validate` or any run.
 
@@ -419,7 +419,7 @@ uv run briefing retention-sweep --dry-run
 - `prompt_template`: prompt template filename under `user_config/prompts/`
 - `note_template`: note template filename under `user_config/templates/`
 - `base_url`: required for `openai-compatible`; the `/v1` base URL of the inference server
-- `api_key_env`: optional for `openai-compatible`; name of the environment variable holding the API key
+- `api_key_env`: optional for `openai-compatible`; name of the environment variable holding the API key. `briefing` checks the process environment, `paths.env_file`, and `~/.llm/.env.llm`.
 - `briefing` does not apply a separate global prompt truncation step after source collection; source-specific `max_characters` settings are the real input budget
 
 Gemini ignores `llm.effort` and uses Gemini defaults.

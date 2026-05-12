@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from briefing.settings import SettingsError, load_series_configs, load_settings
+from briefing.settings import SettingsError, load_env_file, load_series_configs, load_settings
 
 
 SETTINGS_HEADER = """
@@ -91,6 +91,25 @@ def _write_settings(tmp_path: Path, llm_block: str) -> None:
         f"{SETTINGS_HEADER}\n\n[llm]\n{llm_block.strip()}\n",
         encoding="utf-8",
     )
+
+
+def test_load_env_file_accepts_export_prefix(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "# comment",
+                "export LOCAL_LLM_API_KEY='local-key'",
+                'PLAIN_KEY="plain-value"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_env_file(env_file) == {
+        "LOCAL_LLM_API_KEY": "local-key",
+        "PLAIN_KEY": "plain-value",
+    }
 
 
 def test_load_settings_parses_supported_provider_values(tmp_path: Path) -> None:
