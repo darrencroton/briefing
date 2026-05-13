@@ -464,6 +464,16 @@ def test_openai_compatible_generate_sends_correct_request(
     ]
 
 
+def test_openai_compatible_client_uses_configured_retry_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+    app_settings,
+) -> None:
+    app_settings.llm.retry_attempts = 1
+    _provider, clients = _make_api_provider(app_settings, monkeypatch)
+
+    assert clients[0].kwargs["max_retries"] == 0
+
+
 def test_openai_compatible_strips_auth_header_when_no_api_key_configured(
     monkeypatch: pytest.MonkeyPatch,
     app_settings,

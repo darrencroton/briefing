@@ -388,6 +388,7 @@ class OpenAICompatibleAPIProvider:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 timeout=float(self.settings.llm.timeout_seconds),
+                max_retries=self._max_retries(),
             )
         else:
             # No API key — strip the Authorization header the SDK injects so
@@ -399,8 +400,13 @@ class OpenAICompatibleAPIProvider:
                 api_key="not-needed",
                 base_url=self.base_url,
                 timeout=float(self.settings.llm.timeout_seconds),
+                max_retries=self._max_retries(),
                 http_client=httpx.Client(event_hooks={"request": [_strip_auth]}),
             )
+
+    def _max_retries(self) -> int:
+        """Convert configured total attempts into OpenAI SDK retry count."""
+        return max(0, self.settings.llm.retry_attempts - 1)
 
     def _resolve_api_key(self, api_key_env: str) -> str:
         """Resolve a configured API key from process env or known local env files."""
