@@ -22,12 +22,14 @@ from .planning import (
     refresh_active_next_meeting_manifests,
 )
 from .retention import run_retention_sweep_best_effort
-from .settings import AppSettings
+from .bootstrap import local_settings_path
+from .settings import AppSettings, SettingsError, load_settings
 from .state import StateStore
 
 
 NowProvider = Callable[[], datetime]
 SleepFn = Callable[[float], None]
+SettingsLoader = Callable[[AppSettings], AppSettings]
 
 
 def run_watch(
@@ -38,24 +40,37 @@ def run_watch(
     now_provider: NowProvider | None = None,
     sleep_fn: SleepFn | None = None,
     calendar: EventKitClient | None = None,
+    settings_loader: SettingsLoader | None = None,
 ) -> int:
     """Run the long-lived watch loop."""
     logger = logging.getLogger("briefing.watch")
     now_provider = now_provider or (lambda: datetime.now().astimezone())
     sleep_fn = sleep_fn or time.sleep
-    # Long-lived EKEventStore instances can return stale notes for recently copied or edited events.
-    calendar = calendar or EventKitClient(settings, refresh_before_fetch=True)
-    state_store = StateStore(settings)
+    settings_loader = settings_loader or _reload_settings_for_watch
     exit_code = 0
 
     while True:
         exit_code = 0
         now = now_provider()
         try:
+            settings = settings_loader(settings)
+        except (FileNotFoundError, SettingsError, OSError) as exc:
+            logger.exception("briefing watch settings reload failed: %s", exc)
+            exit_code = 1
+            if once:
+                break
+            sleep_fn(settings.meeting_intelligence.watch_poll_seconds)
+            continue
+
+        try:
+            # Rebuild per-cycle state so settings.toml edits are observed without a launchd restart.
+            # Long-lived EKEventStore instances can return stale notes for recently copied or edited events.
+            cycle_calendar = calendar or EventKitClient(settings, refresh_before_fetch=True)
+            state_store = StateStore(settings)
             run_retention_sweep_best_effort(settings, dry_run=dry_run)
             fetch_start = now - timedelta(days=1)
             fetch_end = now + timedelta(minutes=settings.meeting_intelligence.watch_lookahead_minutes)
-            events = _fetch_watch_events(calendar, fetch_start, fetch_end)
+            events = _fetch_watch_events(cycle_calendar, fetch_start, fetch_end)
             invalidated = invalidate_stale_plans(
                 settings,
                 events,
@@ -108,6 +123,18 @@ def run_watch(
             break
         sleep_fn(settings.meeting_intelligence.watch_poll_seconds)
     return exit_code
+
+
+def _reload_settings_for_watch(settings: AppSettings) -> AppSettings:
+    """Reload the mutable local settings file for one watch poll.
+
+    Tests and direct library callers often pass synthetic settings without a
+    bootstrapped user_config/settings.toml. In that case, keep the supplied
+    object. Normal CLI startup has already required this file to exist.
+    """
+    if not local_settings_path(settings.repo_root).exists():
+        return settings
+    return load_settings(settings.repo_root)
 
 
 def _fetch_watch_events(

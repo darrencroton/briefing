@@ -53,6 +53,11 @@ launchctl kickstart -k gui/$(id -u)/com.user.briefing
 
 This installs the separate Meeting Intelligence watcher. It plans eligible sessions, keeps pre-written next manifests fresh, and invokes `noted start --manifest` at pre-roll.
 
+The watcher reloads `user_config/settings.toml` at each poll, so normal settings
+edits do not require a LaunchAgent restart. If the file is temporarily invalid
+while being edited, that poll is skipped and the watcher tries again on the next
+poll.
+
 ### Install
 
 ```bash

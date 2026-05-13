@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import pytest
 import yaml
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from types import SimpleNamespace
 from briefing.models import MeetingEvent
 from briefing.planning import invalidate_stale_plans, plan_event
 from briefing.session.completion import read_completion
+from briefing.settings import SettingsError
 from briefing.state import StateStore
 from briefing.watch import run_watch
 
@@ -107,6 +109,76 @@ def test_watch_refreshes_eventkit_store_per_poll(monkeypatch, app_settings) -> N
 
     assert exit_code == 0
     assert refresh_values == [True]
+
+
+def test_watch_uses_reloaded_settings_for_cycle(monkeypatch, app_settings) -> None:
+    (app_settings.paths.series_dir / "cas-strategy.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "series_id": "cas-strategy",
+                "display_name": "CAS Strategy Meeting",
+                "note_slug": "cas-strategy-meeting",
+                "match": {"title_any": ["CAS Strategy Meeting"]},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    reloaded_settings = replace(
+        app_settings,
+        meeting_intelligence=replace(
+            app_settings.meeting_intelligence,
+            noted_command="noted-reloaded",
+        ),
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    event = MeetingEvent(
+        uid="event-1",
+        title="CAS Strategy Meeting",
+        start=now + timedelta(seconds=75),
+        end=now + timedelta(hours=1),
+        calendar_name="Work",
+    )
+    launches: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        launches.append(command)
+        return SimpleNamespace(returncode=0, stdout='{"ok":true}', stderr="")
+
+    monkeypatch.setattr("briefing.watch.subprocess.run", fake_run)
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([event]),
+        settings_loader=lambda _settings: reloaded_settings,
+    )
+
+    assert exit_code == 0
+    assert launches[0][:3] == ["noted-reloaded", "start", "--manifest"]
+    plans = StateStore(reloaded_settings).list_session_plans()
+    assert len(plans) == 1
+    assert plans[0].status == "launched"
+
+
+def test_watch_skips_cycle_when_settings_reload_fails(monkeypatch, app_settings) -> None:
+    monkeypatch.setattr(
+        "briefing.watch.run_retention_sweep_best_effort",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should skip cycle")),
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+
+    exit_code = run_watch(
+        app_settings,
+        once=True,
+        dry_run=True,
+        now_provider=lambda: now,
+        calendar=FakeCalendar([]),
+        settings_loader=lambda _settings: (_ for _ in ()).throw(SettingsError("bad config")),
+    )
+
+    assert exit_code == 1
 
 
 def test_watch_dry_run_does_not_block_later_real_launch(monkeypatch, app_settings) -> None:
