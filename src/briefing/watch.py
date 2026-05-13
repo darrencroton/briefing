@@ -49,6 +49,13 @@ def run_watch(
     settings_loader = settings_loader or _reload_settings_for_watch
     exit_code = 0
 
+    # Reuse one EventKitClient (and its EKEventStore) for the lifetime of the watcher.
+    # macOS refuses with EKCADErrorDomain 1021 ("too many EKEventStore instances") if a
+    # long-running process keeps allocating new stores; per-cycle freshness is handled by
+    # refresh_before_fetch=True, which calls store.reset() before each fetch.
+    owns_calendar = calendar is None
+    calendar_client = calendar or EventKitClient(settings, refresh_before_fetch=True)
+
     while True:
         exit_code = 0
         now = now_provider()
@@ -61,16 +68,16 @@ def run_watch(
                 break
             sleep_fn(settings.meeting_intelligence.watch_poll_seconds)
             continue
+        if owns_calendar:
+            # Propagate reloaded settings without rebuilding the EventKit store.
+            calendar_client.settings = settings
 
         try:
-            # Rebuild per-cycle state so settings.toml edits are observed without a launchd restart.
-            # Long-lived EKEventStore instances can return stale notes for recently copied or edited events.
-            cycle_calendar = calendar or EventKitClient(settings, refresh_before_fetch=True)
             state_store = StateStore(settings)
             run_retention_sweep_best_effort(settings, dry_run=dry_run)
             fetch_start = now - timedelta(days=1)
             fetch_end = now + timedelta(minutes=settings.meeting_intelligence.watch_lookahead_minutes)
-            events = _fetch_watch_events(cycle_calendar, fetch_start, fetch_end)
+            events = _fetch_watch_events(calendar_client, fetch_start, fetch_end)
             invalidated = invalidate_stale_plans(
                 settings,
                 events,

@@ -87,12 +87,13 @@ def test_watch_cycle_runs_retention_best_effort(monkeypatch, app_settings) -> No
     assert calls == [(app_settings, True)]
 
 
-def test_watch_refreshes_eventkit_store_per_poll(monkeypatch, app_settings) -> None:
+def test_watch_constructs_eventkit_client_once_with_refresh(monkeypatch, app_settings) -> None:
     refresh_values: list[bool] = []
 
     class FakeEventKitClient:
         def __init__(self, settings, *, refresh_before_fetch: bool = False) -> None:
             refresh_values.append(refresh_before_fetch)
+            self.settings = settings
 
         def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
             return []
@@ -109,6 +110,55 @@ def test_watch_refreshes_eventkit_store_per_poll(monkeypatch, app_settings) -> N
 
     assert exit_code == 0
     assert refresh_values == [True]
+
+
+def test_watch_reuses_single_eventkit_client_across_polls(monkeypatch, app_settings) -> None:
+    """Regression: a long-lived watcher must not allocate a new EKEventStore each poll.
+
+    macOS raises EKCADErrorDomain 1021 ("too many EKEventStore instances") once a process
+    accumulates ~50 stores, which would silently disable the watcher mid-day.
+    """
+    constructions: list[object] = []
+    fetched_settings: list[object] = []
+
+    class FakeEventKitClient:
+        def __init__(self, settings, *, refresh_before_fetch: bool = False) -> None:
+            constructions.append(settings)
+            self.settings = settings
+
+        def fetch_events(self, start: datetime, end: datetime) -> list[MeetingEvent]:
+            fetched_settings.append(self.settings)
+            return []
+
+    monkeypatch.setattr("briefing.watch.EventKitClient", FakeEventKitClient)
+
+    reloaded_settings = replace(
+        app_settings,
+        meeting_intelligence=replace(
+            app_settings.meeting_intelligence,
+            noted_command="noted-reloaded",
+        ),
+    )
+    now = datetime.fromisoformat("2026-04-13T09:58:45+10:00")
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        if len(sleeps) >= 3:
+            raise StopIteration("stop watch loop")
+
+    with pytest.raises(StopIteration):
+        run_watch(
+            app_settings,
+            dry_run=True,
+            now_provider=lambda: now,
+            sleep_fn=fake_sleep,
+            settings_loader=lambda _settings: reloaded_settings,
+        )
+
+    assert len(constructions) == 1
+    # Reloaded settings must reach the calendar client without rebuilding it.
+    assert fetched_settings[-1] is reloaded_settings
 
 
 def test_watch_uses_reloaded_settings_for_cycle(monkeypatch, app_settings) -> None:
