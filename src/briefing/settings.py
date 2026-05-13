@@ -364,7 +364,7 @@ def _parse_meeting_intelligence_settings(
             "Invalid settings file: [meeting_intelligence].raw_audio_retention_days must be at least 1."
         )
 
-    default_mode = str(raw.get("default_mode", "in_person")).strip()
+    default_mode = str(raw.get("default_mode", "hybrid")).strip()
     if default_mode not in _VALID_MODE_TYPES:
         raise SettingsError(
             "Invalid settings file: [meeting_intelligence].default_mode must be one of "

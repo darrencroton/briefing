@@ -229,7 +229,7 @@ def test_assemble_manifest_validates_against_contract(app_settings, series_confi
     errors = list(manifest_validator().iter_errors(manifest))
     assert errors == []
     assert manifest["session_id"] == "2026-04-13T100000+1000-cas-strategy-meeting"
-    assert manifest["mode"] == {"type": "in_person"}
+    assert manifest["mode"] == {"type": "hybrid"}
     assert manifest["paths"]["note_path"].endswith("2026-04-13-1000-cas-strategy-meeting.md")
     assert manifest["transcription"]["speaker_count_hint"] == 2
 

@@ -32,7 +32,7 @@ reschedule_tolerance_seconds = 300
 
 # These become manifest defaults when calendar notes and series YAML omit a field.
 default_host_name = "Meeting host"
-default_mode = "in_person"
+default_mode = "hybrid"
 default_language = "en-AU"
 default_asr_backend = "whisperkit"
 default_diarization_enabled = true

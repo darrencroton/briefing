@@ -376,7 +376,7 @@ default_location_type = "office"
 - `default_location_type`: optional default target location for recorded meetings, such as `office`; leave unset to disable multi-Mac routing by default
 - `local_location_type`: optional direct location label for this Mac, such as `home`; if unset, `briefing` checks `location_type_by_host`
 - `location_type_by_host`: optional table mapping macOS `HostName`, `LocalHostName`, or `ComputerName` values to location labels
-- `default_host_name`, `default_language`, `default_asr_backend`, `default_diarization_enabled`, `default_mode`: manifest defaults
+- `default_host_name`, `default_language`, `default_asr_backend`, `default_diarization_enabled`, `default_mode`: manifest defaults; `default_mode` defaults to `hybrid`
 - `one_off_note_dir`: optional note directory for one-off `noted config` events; defaults to `paths.meeting_notes_dir`
 - `auto_start`, `auto_stop`, `default_extension_minutes`, `max_single_extension_minutes`, `pre_end_prompt_minutes`, `no_interaction_grace_minutes`: default recording policy fields
 

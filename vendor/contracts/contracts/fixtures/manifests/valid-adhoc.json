@@ -4,14 +4,14 @@
   "created_at": "2026-04-24T11:15:00+10:00",
   "meeting": {
     "event_id": null,
-    "title": "Ad hoc room capture",
+    "title": "Ad hoc hybrid capture",
     "start_time": "2026-04-24T11:15:00+10:00",
     "scheduled_end_time": null,
     "timezone": "Australia/Melbourne",
     "location": "Conference Room 1A"
   },
   "mode": {
-    "type": "in_person"
+    "type": "hybrid"
   },
   "participants": {
     "host_name": "Manual Operator",

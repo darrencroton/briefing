@@ -80,7 +80,7 @@ def app_settings(tmp_path: Path) -> AppSettings:
             default_language="en-AU",
             default_asr_backend="whisperkit",
             default_diarization_enabled=True,
-            default_mode="in_person",
+            default_mode="hybrid",
             one_off_note_dir=meeting_notes_dir,
             auto_start=True,
             auto_stop=True,
